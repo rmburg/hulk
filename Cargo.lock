@@ -4373,6 +4373,7 @@ dependencies = [
  "itertools",
  "log",
  "mlua",
+ "motionfile",
  "nalgebra",
  "projection",
  "repository",
