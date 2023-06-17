@@ -41,6 +41,7 @@ pub struct CycleContext {
     pub primary_state: Input<PrimaryState, "primary_state">,
     pub robot_to_field: Input<Option<Isometry2<f32>>, "robot_to_field?">,
     pub cycle_time: Input<CycleTime, "cycle_time">,
+    pub time_to_reach_kick_position: Input<Option<f32>, "time_to_reach_kick_position?">,
 
     pub field_dimensions: Parameter<FieldDimensions, "field_dimensions">,
     pub forced_role: Parameter<Option<Role>, "role_assignment.forced_role?">,
@@ -253,6 +254,9 @@ impl RoleAssignment {
                                     robot_to_field,
                                     cycle_start_time,
                                 ),
+                                time_to_reach_kick_position: context
+                                    .time_to_reach_kick_position
+                                    .copied(),
                             }))?;
                     } else {
                         context
@@ -265,6 +269,9 @@ impl RoleAssignment {
                                     context.ball_position,
                                     cycle_start_time,
                                 ),
+                                time_to_reach_kick_position: context
+                                    .time_to_reach_kick_position
+                                    .copied(),
                             }))?;
                     }
                 }

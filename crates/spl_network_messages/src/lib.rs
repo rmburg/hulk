@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use nalgebra::Point2;
+use nalgebra::{Isometry2, Point2};
 use serde::{Deserialize, Serialize};
 
 pub use game_controller_return_message::GameControllerReturnMessage;
@@ -17,7 +17,14 @@ pub use game_controller_state_message::{
 };
 use serialize_hierarchy::SerializeHierarchy;
 
-pub type HulkMessage = GameControllerReturnMessage;
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+pub struct HulkMessage {
+    pub player_number: PlayerNumber,
+    pub fallen: bool,
+    pub robot_to_field: Isometry2<f32>,
+    pub ball_position: Option<BallPosition>,
+    pub time_to_reach_kick_position: Option<f32>,
+}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, SerializeHierarchy)]
 pub struct BallPosition {
