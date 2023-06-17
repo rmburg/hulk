@@ -9,6 +9,7 @@ use control::{
     motion::look_around::LookAround,
     role_assignment::{self, RoleAssignment},
     rule_obstacle_composer::RuleObstacleComposer,
+    time_to_reach_kick_position::{self, TimeToReachKickPosition},
     world_state_composer::{self, WorldStateComposer},
 };
 use cyclers::control::Database;
@@ -21,6 +22,7 @@ pub struct BehaviorCycler<Interface> {
     hardware_interface: Arc<Interface>,
     own_changed: Arc<Notify>,
     role_assignment: RoleAssignment,
+    time_to_reach_kick_position: TimeToReachKickPosition,
     ball_state_composer: BallStateComposer,
     active_vision: ActiveVision,
     kick_selector: KickSelector,
@@ -49,6 +51,9 @@ where
             spl_network: &configuration.spl_network,
         })
         .wrap_err("failed to create node `RoleAssignment`")?;
+        let time_to_reach_kick_position =
+            TimeToReachKickPosition::new(time_to_reach_kick_position::CreationContext {})
+                .wrap_err("failed to create node `TimeToReachKickPosition`")?;
         let ball_state_composer = BallStateComposer::new(ball_state_composer::CreationContext {})
             .wrap_err("failed to create node `BallStateComposer`")?;
         let active_vision = ActiveVision::new(active_vision::CreationContext {
@@ -79,6 +84,7 @@ where
             own_changed,
 
             role_assignment,
+            time_to_reach_kick_position,
             ball_state_composer,
             rule_obstacle_composer,
             active_vision,
@@ -133,6 +139,10 @@ where
                     primary_state: &own_database.main_outputs.primary_state,
                     robot_to_field: own_database.main_outputs.robot_to_field.as_ref(),
                     cycle_time: &own_database.main_outputs.cycle_time,
+                    time_to_reach_kick_position: own_database
+                        .main_outputs
+                        .time_to_reach_kick_position
+                        .as_ref(),
                     field_dimensions: &configuration.field_dimensions,
                     forced_role: configuration.role_assignment.forced_role.as_ref(),
                     initial_poses: &configuration.localization.initial_poses,
@@ -150,6 +160,17 @@ where
             own_database.main_outputs.network_robot_obstacles =
                 main_outputs.network_robot_obstacles.value;
             own_database.main_outputs.role = main_outputs.role.value;
+        }
+        {
+            let main_outputs = self
+                .time_to_reach_kick_position
+                .cycle(time_to_reach_kick_position::CycleContext {
+                    ball_state: own_database.main_outputs.ball_state.as_ref(),
+                    rule_ball_state: own_database.main_outputs.rule_ball_state.as_ref(),
+                })
+                .wrap_err("failed to execute cycle of node `TimeToReachKickPosition`")?;
+            own_database.main_outputs.time_to_reach_kick_position =
+                main_outputs.time_to_reach_kick_position.value;
         }
         {
             let main_outputs = self
