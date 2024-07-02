@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 
 use coordinate_systems::Field;
-use linear_algebra::{Orientation2, Orientation3};
-use nalgebra::{UnitComplex, UnitQuaternion, Vector3};
+use linear_algebra::{Orientation2, Orientation3, Vector3};
+use nalgebra::{UnitComplex, UnitQuaternion};
 use path_serde::{PathDeserialize, PathIntrospect, PathSerialize};
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +43,7 @@ impl State {
     Clone, Debug, Default, Deserialize, PathDeserialize, PathIntrospect, PathSerialize, Serialize,
 )]
 #[path_serde(add_leaf(euler_angles: EulerAngles))]
+#[path_serde(add_leaf(aldebaran: AldebaranAngles))]
 pub struct Orientation {
     inner: Orientation3<Field>,
 }
@@ -74,4 +75,43 @@ impl TryFrom<&Orientation> for EulerAngles {
 
         Ok(EulerAngles { roll, pitch, yaw })
     }
+}
+
+#[derive(Serialize)]
+pub struct AldebaranAngles {
+    pub angle_x: f32,
+    pub angle_y: f32,
+    pub yaw: f32,
+}
+
+impl TryFrom<&Orientation> for AldebaranAngles {
+    type Error = Infallible;
+
+    fn try_from(value: &Orientation) -> Result<Self, Self::Error> {
+        let rotation = value.inner.rotation::<Field>();
+
+        let x = rotation * Vector3::x_axis();
+        let y = rotation * Vector3::y_axis();
+        let z = rotation * Vector3::z_axis();
+
+        let up = Vector3::<Field>::z_axis();
+
+        let up_in_yz = project_to_plane(x, up);
+        let up_in_xz = project_to_plane(y, up);
+
+        let angle_x = z.angle(up_in_yz);
+        let angle_y = z.angle(up_in_xz);
+
+        let (_, _, yaw) = value.inner.inner.euler_angles();
+
+        Ok(AldebaranAngles {
+            angle_x,
+            angle_y,
+            yaw,
+        })
+    }
+}
+
+fn project_to_plane<Frame>(normal: Vector3<Frame>, vector: Vector3<Frame>) -> Vector3<Frame> {
+    (vector - vector * normal.dot(vector)).normalize()
 }
