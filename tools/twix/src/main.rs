@@ -33,8 +33,9 @@ use log::error;
 use nao::Nao;
 use panel::Panel;
 use panels::{
-    EnumPlotPanel, ImageColorSelectPanel, ImagePanel, ImageSegmentsPanel, ManualCalibrationPanel,
-    MapPanel, ParameterPanel, PlotPanel, RemotePanel, TextPanel, VisionTunerPanel,
+    BehaviorSimulatorPanel, EnumPlotPanel, ImageColorSelectPanel, ImagePanel, ImageSegmentsPanel,
+    ManualCalibrationPanel, MapPanel, ParameterPanel, PlotPanel, RemotePanel, TextPanel,
+    VisionTunerPanel,
 };
 
 use repository::{get_repository_root, Repository};
@@ -47,11 +48,11 @@ use visuals::Visuals;
 
 mod completion_edit;
 mod configuration;
+mod log_error;
 mod nao;
 mod panel;
 mod panels;
-//mod players_value_buffer;
-mod log_error;
+mod players_buffer_handle;
 mod repository_parameters;
 mod selectable_panel_macro;
 mod twix_painter;
@@ -153,8 +154,7 @@ impl ReachableNaos {
 }
 
 impl_selectable_panel!(
-    // TODO:
-    // BehaviorSimulatorPanel,
+    BehaviorSimulatorPanel,
     ImagePanel,
     ImageSegmentsPanel,
     //LookAtPanel,
