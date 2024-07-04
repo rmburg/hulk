@@ -6,7 +6,7 @@ use source_analyzer::{pretty::to_string_pretty, structs::Structs};
 fn main() -> Result<()> {
     #[allow(unused_mut)] // must not be mut if "with_detection" feature is disabled
     let mut cyclers = collect_hulk_cyclers()?;
-    #[cfg(not(feature = "with_object_detection"))]
+    #[cfg(not(feature = "with_detection"))]
     cyclers
         .cyclers
         .retain(|cycler| cycler.name != "ObjectDetection");

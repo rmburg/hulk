@@ -2241,6 +2241,7 @@ dependencies = [
  "fern",
  "log",
  "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]
@@ -2942,8 +2943,10 @@ dependencies = [
  "ittapi",
  "libc",
  "linear_algebra",
+ "log",
  "nalgebra",
  "object_detection",
+ "parameters",
  "path_serde",
  "projection",
  "serde",
@@ -3092,6 +3095,7 @@ dependencies = [
  "linear_algebra",
  "nalgebra",
  "object_detection",
+ "parameters",
  "path_serde",
  "projection",
  "serde",
@@ -4426,7 +4430,7 @@ dependencies = [
  "hulk",
  "parameters",
  "serde_json",
- "tokio",
+ "types",
 ]
 
 [[package]]
@@ -4436,7 +4440,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "tokio",
+ "types",
 ]
 
 [[package]]
@@ -4951,6 +4955,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml",
+ "types",
 ]
 
 [[package]]
@@ -6008,6 +6013,8 @@ dependencies = [
  "argument_parsers",
  "ball_filter",
  "bincode",
+ "buffered_watch",
+ "chrono",
  "clap 4.5.4",
  "color-eyre",
  "communication",
@@ -6019,6 +6026,7 @@ dependencies = [
  "egui_extras",
  "egui_plot",
  "fern",
+ "framework",
  "fuzzy-matcher",
  "geometry",
  "gilrs",
