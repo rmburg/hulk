@@ -34,8 +34,8 @@ use nao::Nao;
 use panel::Panel;
 use panels::{
     BehaviorSimulatorPanel, EnumPlotPanel, ImageColorSelectPanel, ImagePanel, ImageSegmentsPanel,
-    ManualCalibrationPanel, MapPanel, ParameterPanel, PlotPanel, RemotePanel, TextPanel,
-    VisionTunerPanel,
+    LookAtPanel, ManualCalibrationPanel, MapPanel, ParameterPanel, PlotPanel, RemotePanel,
+    TextPanel, VisionTunerPanel,
 };
 
 use repository::{get_repository_root, Repository};
@@ -157,7 +157,7 @@ impl_selectable_panel!(
     BehaviorSimulatorPanel,
     ImagePanel,
     ImageSegmentsPanel,
-    //LookAtPanel,
+    LookAtPanel,
     ManualCalibrationPanel,
     MapPanel,
     ParameterPanel,
