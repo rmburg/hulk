@@ -4,7 +4,8 @@ use std::{
 };
 
 use color_eyre::Result;
-use itertools::iproduct;
+use geometry::{line_segment::LineSegment, rectangle::Rectangle};
+use itertools::{iproduct, Itertools};
 use projection::{camera_matrix::CameraMatrix, horizon::Horizon, Projection};
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +22,8 @@ use types::{
     parameters::{EdgeDetectionSourceParameters, MedianModeParameters},
     ycbcr422_image::YCbCr422Image,
 };
+
+use crate::axis_aligned_clamping::AxisAlignedClamping;
 
 #[derive(Deserialize, Serialize)]
 pub struct ImageSegmenter {
@@ -132,6 +135,23 @@ fn padding_size(median_mode: MedianModeParameters) -> u32 {
         MedianModeParameters::ThreePixels => 1,
         MedianModeParameters::FivePixels => 2,
     }
+}
+
+fn minimum_y(pixel_polygon: &[Point2<Pixel>], image: &YCbCr422Image) -> Option<f32> {
+    let image_rect = Rectangle {
+        min: point![0.0, 0.0],
+        max: point![image.width() as f32, image.height() as f32],
+    };
+    pixel_polygon
+        .iter()
+        .tuple_windows()
+        .filter_map(|(start, end)| {
+            let line_segment = LineSegment::new(*start, *end);
+            let clamped_line_segment = line_segment.clamp_to_rect(image_rect)?;
+
+            Some(clamped_line_segment.0.y().min(clamped_line_segment.1.y()))
+        })
+        .min_by(f32::total_cmp)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -1,3 +1,4 @@
+pub mod axis_aligned_clamping;
 pub mod ball_detection;
 pub mod calibration_measurement_provider;
 pub mod camera_matrix_extractor;
