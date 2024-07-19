@@ -48,7 +48,7 @@ fn get_axis_value(gamepad: Gamepad, axis: Axis) -> Option<f32> {
 impl RemotePanel {
     fn reset(&self) {
         self.update_step(Value::Null);
-        self.update_look_at_angle(Value::Null);
+        self.update_head_joints(Value::Null);
     }
 
     fn update_step(&self, step: Value) {
@@ -58,7 +58,7 @@ impl RemotePanel {
         )
     }
 
-    fn update_look_at_angle(&self, joints: Value) {
+    fn update_head_joints(&self, joints: Value) {
         self.nao.write(
             "parameters.head_motion.injected_head_joints",
             TextOrBinary::Text(joints),
@@ -104,7 +104,7 @@ impl Widget for &mut RemotePanel {
                 .unwrap_or_default();
             let turn = turn_left - turn_right;
 
-            let head_pitch = get_axis_value(gamepad, Axis::RightStickY).unwrap_or(0.0);
+            let head_pitch = -get_axis_value(gamepad, Axis::RightStickY).unwrap_or(0.0);
             let head_yaw = -get_axis_value(gamepad, Axis::RightStickX).unwrap_or(0.0);
 
             let injected_head_joints = HeadJoints {
@@ -127,7 +127,7 @@ impl Widget for &mut RemotePanel {
                 {
                     self.last_update = now;
                     self.update_step(serde_json::to_value(step).unwrap());
-                    self.update_look_at_angle(serde_json::to_value(injected_head_joints).unwrap());
+                    self.update_head_joints(serde_json::to_value(injected_head_joints).unwrap());
                 }
             }
 
