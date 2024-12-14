@@ -5114,6 +5114,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "partial"
+version = "0.1.0"
+dependencies = [
+ "partial_derive",
+ "serde",
+]
+
+[[package]]
+name = "partial_derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6776,6 +6794,8 @@ dependencies = [
  "mlua",
  "nalgebra",
  "parameters",
+ "partial",
+ "partial_derive",
  "projection",
  "repository",
  "serde",
