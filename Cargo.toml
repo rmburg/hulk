@@ -43,6 +43,8 @@ members = [
   "crates/source_analyzer",
   "crates/spl_network",
   "crates/spl_network_messages",
+  "crates/step_planning",
+  "crates/step_planning_solver",
   "crates/types",
   "crates/vision",
   "crates/walking_engine",
@@ -74,6 +76,8 @@ aliveness = { path = "crates/aliveness" }
 alsa = "0.7.0"
 approx = "0.5.1"
 approx_derive = { path = "crates/approx_derive" }
+argmin = "0.10.0"
+argmin-math = { version = "0.4.0", features = ["nalgebra_latest"] }
 argument_parsers = { path = "crates/argument_parsers" }
 audio = { path = "crates/audio" }
 awaitgroup = "0.6.0"
@@ -153,6 +157,7 @@ ndarray = { version = "0.15.6", features = ["serde"] }
 nix = { version = "0.28", features = ["ioctl"] }
 nucleo-matcher = "0.3.1"
 num-derive = "0.4.2"
+num-dual = "0.9.0"
 num-traits = "0.2"
 object_detection = { path = "crates/object_detection" }
 once_cell = "1.19.0"
@@ -198,6 +203,8 @@ source_analyzer = { path = "crates/source_analyzer" }
 spl_network = { path = "crates/spl_network" }
 spl_network_messages = { path = "crates/spl_network_messages" }
 splines = { version = "4.2.0", features = ["serde"] }
+step_planning = { path = "crates/step_planning" }
+step_planning_solver = { path = "crates/step_planning_solver" }
 structopt = "0.3.26"
 syn = { version = "2.0.60", features = ["extra-traits", "full"] }
 systemd = "0.10.0"
