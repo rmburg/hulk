@@ -201,30 +201,12 @@ fn walk_volume_gradient(
     }
 }
 
-// const STEEPNESS: f64 = 10.0;
-
 fn penalty_function(walk_volume_value: f64) -> f64 {
-    // ((walk_volume_value - 1.0) * STEEPNESS).exp()
-
-    // walk_volume_value
-
     walk_volume_value.powi(6)
-
-    // walk_volume_value.powi(4)
-
-    // walk_volume_value.powi(2)
 }
 
 fn penalty_function_derivative(walk_volume_value: f64) -> f64 {
-    // STEEPNESS * penalty_function(walk_volume_value)
-
-    // 1.0
-
     walk_volume_value.powi(5) * 6.0
-
-    // walk_volume_value.powi(3) * 4.0
-
-    // walk_volume_value * 2.0
 }
 
 #[derive(Clone, Debug)]
