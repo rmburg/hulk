@@ -11,10 +11,10 @@ use nalgebra::{
 use num_dual::{Derivative, DualNum, DualNumFloat, DualVec};
 
 use step_planning::{
-    geometry::{pose::Side, Path, Pose},
+    geometry::{pose::Side, Path},
     loss_fields::step_size::{WalkVolumeCoefficients, WalkVolumeExtents},
     step_plan::{PlannedStep, StepPlan, StepPlanning},
-    traits::{LossField, ScaledGradient, UnwrapDual, WrapDual},
+    traits::{LossField, ScaledGradient, UnwrapDual},
 };
 
 const STEPS_TO_PLAN: usize = 15;
@@ -52,13 +52,7 @@ impl CostFunction for StepPlanningProblem {
 
         let loss = self
             .step_planning
-            .planned_steps(
-                self.step_planning
-                    .initial_pose
-                    .clone()
-                    .with_support_foot(self.step_planning.initial_support_foot),
-                &step_plan,
-            )
+            .planned_steps(self.step_planning.initial_support_foot, &step_plan)
             .map(|planned_step| step_planning_loss.loss(planned_step))
             .sum();
 
@@ -96,14 +90,7 @@ impl Gradient for StepPlanningProblem {
 
         let gradient: SVector<f64, NUM_VARIABLES> = self
             .step_planning
-            .planned_steps(
-                self.step_planning
-                    .initial_pose
-                    .clone()
-                    .with_support_foot(self.step_planning.initial_support_foot)
-                    .wrap_dual(),
-                &step_plan,
-            )
+            .planned_steps(self.step_planning.initial_support_foot, &step_plan)
             .map(|dual_planned_step| {
                 let (planned_step, planned_step_gradients) = dual_planned_step.unwrap_dual();
 
@@ -119,18 +106,13 @@ impl Gradient for StepPlanningProblem {
     }
 }
 
-pub fn plan_steps(
-    path: Path,
-    initial_pose: Pose<f64>,
-    initial_support_foot: Side,
-) -> Result<Vec<PlannedStep<f64>>> {
+pub fn plan_steps(path: Path, initial_support_foot: Side) -> Result<Vec<PlannedStep<f64>>> {
     let line_search = MoreThuenteLineSearch::new();
     let solver = LBFGS::new(line_search, 10);
 
     let problem = StepPlanningProblem {
         step_planning: StepPlanning {
             path,
-            initial_pose: initial_pose.clone(),
             initial_support_foot,
             path_progress_reward: 5.0,
             path_distance_penalty: 50.0,
@@ -164,10 +146,7 @@ pub fn plan_steps(
 
     let steps = problem
         .step_planning
-        .planned_steps(
-            initial_pose.with_support_foot(initial_support_foot),
-            &step_plan,
-        )
+        .planned_steps(initial_support_foot, &step_plan)
         .collect();
 
     Ok(steps)

@@ -35,7 +35,6 @@ impl<'a, T: RealField> StepPlan<'a, T> {
 #[derive(Clone)]
 pub struct StepPlanning {
     pub path: Path,
-    pub initial_pose: Pose<f64>,
     pub initial_support_foot: Side,
     pub path_progress_smoothness: f64,
     pub path_progress_reward: f64,
@@ -47,21 +46,27 @@ pub struct StepPlanning {
 impl StepPlanning {
     pub fn planned_steps<'a, T: RealField>(
         &self,
-        initial_pose: PoseAndSupportFoot<T>,
+        initial_support_foot: Side,
         step_plan: &StepPlan<'a, T>,
     ) -> impl Iterator<Item = PlannedStep<T>> + 'a {
-        step_plan.steps().scan(initial_pose, |pose, step| {
-            pose.pose += step.clone();
+        step_plan.steps().scan(
+            PoseAndSupportFoot {
+                pose: Pose::zero(),
+                support_foot: initial_support_foot,
+            },
+            |pose, step| {
+                pose.pose += step.clone();
 
-            let planned_step = PlannedStep {
-                pose: pose.pose.clone(),
-                step: step.with_support_foot(pose.support_foot),
-            };
+                let planned_step = PlannedStep {
+                    pose: pose.pose.clone(),
+                    step: step.with_support_foot(pose.support_foot),
+                };
 
-            pose.support_foot.flip();
+                pose.support_foot.flip();
 
-            Some(planned_step)
-        })
+                Some(planned_step)
+            },
+        )
     }
 
     pub fn loss_field(&self) -> StepPlanningLossField {

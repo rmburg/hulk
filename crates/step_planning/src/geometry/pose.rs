@@ -4,7 +4,7 @@ use std::{
 };
 
 use nalgebra::{vector, Point2, RealField, Rotation2, Scalar};
-use num_traits::Euclid;
+use num_traits::{Euclid, Zero};
 
 use crate::step_plan::Step;
 
@@ -25,6 +25,15 @@ impl<T: Scalar> Pose<T> {
         PoseAndSupportFoot {
             pose: self,
             support_foot,
+        }
+    }
+}
+
+impl<T: Scalar + Zero> Pose<T> {
+    pub fn zero() -> Self {
+        Self {
+            position: Point2::origin(),
+            orientation: T::zero(),
         }
     }
 }
