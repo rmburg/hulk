@@ -12,3 +12,4 @@ color-eyre.workspace = true
 nalgebra.workspace = true
 num-dual.workspace = true
 step_planning.workspace = true
+types.workspace = true
