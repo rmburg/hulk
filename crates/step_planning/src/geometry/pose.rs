@@ -6,6 +6,8 @@ use std::{
 use nalgebra::{vector, Point2, RealField, Rotation2, Scalar};
 use num_traits::Euclid;
 
+use types::support_foot::Side;
+
 use crate::step_plan::Step;
 
 #[derive(Clone, Debug)]
@@ -26,26 +28,6 @@ impl<T: Scalar> Pose<T> {
             pose: self,
             support_foot,
         }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Side {
-    Left,
-    Right,
-}
-
-impl Side {
-    #[must_use]
-    pub fn opposite(&self) -> Self {
-        match self {
-            Side::Left => Side::Right,
-            Side::Right => Side::Left,
-        }
-    }
-
-    pub fn flip(&mut self) {
-        *self = self.opposite();
     }
 }
 

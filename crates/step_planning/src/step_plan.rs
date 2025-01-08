@@ -2,12 +2,10 @@ use std::ops::Mul;
 
 use nalgebra::{RealField, Scalar};
 use num_traits::Euclid;
+use types::support_foot::Side;
 
 use crate::{
-    geometry::{
-        pose::{PoseAndSupportFoot, Side},
-        Path, Pose,
-    },
+    geometry::{pose::PoseAndSupportFoot, Path, Pose},
     loss_fields::{
         path_distance::PathDistanceField,
         path_progress::PathProgressField,
@@ -58,7 +56,7 @@ impl StepPlanning {
                 step: step.with_support_foot(pose.support_foot),
             };
 
-            pose.support_foot.flip();
+            pose.support_foot = pose.support_foot.opposite();
 
             Some(planned_step)
         })

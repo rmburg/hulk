@@ -6839,6 +6839,7 @@ dependencies = [
  "nalgebra",
  "num-dual",
  "num-traits",
+ "types",
 ]
 
 [[package]]
@@ -6851,6 +6852,7 @@ dependencies = [
  "nalgebra",
  "num-dual",
  "step_planning",
+ "types",
 ]
 
 [[package]]

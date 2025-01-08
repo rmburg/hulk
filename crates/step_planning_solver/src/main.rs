@@ -4,9 +4,10 @@ use color_eyre::Result;
 use nalgebra::{point, Point2};
 
 use step_planning::geometry::{
-    pose::Side, Angle, Arc, Circle, Direction, LineSegment, Path, PathSegment, Pose,
+    Angle, Arc, Circle, Direction, LineSegment, Path, PathSegment, Pose,
 };
 use step_planning_solver::plan_steps;
+use types::support_foot::Side;
 
 fn main() -> Result<()> {
     color_eyre::install()?;

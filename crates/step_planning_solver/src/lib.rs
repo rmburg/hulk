@@ -11,11 +11,12 @@ use nalgebra::{
 use num_dual::{Derivative, DualNum, DualNumFloat, DualVec};
 
 use step_planning::{
-    geometry::{pose::Side, Path, Pose},
+    geometry::{Path, Pose},
     loss_fields::step_size::{WalkVolumeCoefficients, WalkVolumeExtents},
     step_plan::{PlannedStep, StepPlan, StepPlanning},
     traits::{LossField, ScaledGradient, UnwrapDual, WrapDual},
 };
+use types::support_foot::Side;
 
 const STEPS_TO_PLAN: usize = 15;
 const VARIABLES_PER_STEP: usize = 3;

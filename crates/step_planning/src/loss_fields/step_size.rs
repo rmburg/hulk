@@ -1,4 +1,6 @@
-use crate::{geometry::pose::Side, step_plan::Step, traits::LossField};
+use types::support_foot::Side;
+
+use crate::{step_plan::Step, traits::LossField};
 
 pub struct StepSizeField {
     pub walk_volume_coefficients: WalkVolumeCoefficients,
