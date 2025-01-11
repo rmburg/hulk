@@ -5,7 +5,7 @@ use nalgebra::RealField;
 use num_traits::Euclid;
 use serde::{Deserialize, Serialize};
 
-use linear_algebra::{vector, Rotation2, Vector2};
+use linear_algebra::{vector, Vector2};
 use path_serde::{PathDeserialize, PathIntrospect, PathSerialize};
 
 use crate::direction::Direction;
@@ -128,14 +128,6 @@ impl<T: Mul<Output = T>> Mul<T> for Angle<T> {
 
     fn mul(self, rhs: T) -> Self::Output {
         Self(self.0 * rhs)
-    }
-}
-
-impl<T: RealField, Frame> Mul<Vector2<Frame, T>> for Angle<T> {
-    type Output = Vector2<Frame, T>;
-
-    fn mul(self, rhs: Vector2<Frame, T>) -> Self::Output {
-        Rotation2::new(self.0) * rhs
     }
 }
 

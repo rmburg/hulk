@@ -1,11 +1,10 @@
-use std::f64::consts::FRAC_PI_2;
+use std::f32::consts::FRAC_PI_2;
 
 use color_eyre::Result;
-use nalgebra::{point, Point2};
 
-use step_planning::geometry::{
-    Angle, Arc, Circle, Direction, LineSegment, Path, PathSegment, Pose,
-};
+use geometry::{angle::Angle, circle::Circle, direction::Direction};
+use linear_algebra::point;
+use step_planning::geometry::{Arc, LineSegment, Path, PathSegment, Pose};
 use step_planning_solver::plan_steps;
 use types::support_foot::Side;
 
@@ -29,7 +28,7 @@ fn main() -> Result<()> {
     };
 
     let initial_pose = Pose {
-        position: Point2::new(0.0, 0.0),
+        position: point![0.0, 0.0],
         orientation: 0.0,
     };
     let initial_support_foot = Side::Left;

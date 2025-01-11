@@ -2,6 +2,8 @@ use std::ops::Mul;
 
 use nalgebra::{RealField, Scalar};
 use num_traits::Euclid;
+
+use geometry::angle::Angle;
 use types::support_foot::Side;
 
 use crate::{
@@ -33,12 +35,12 @@ impl<'a, T: RealField> StepPlan<'a, T> {
 #[derive(Clone)]
 pub struct StepPlanning {
     pub path: Path,
-    pub initial_pose: Pose<f64>,
+    pub initial_pose: Pose<f32>,
     pub initial_support_foot: Side,
-    pub path_progress_smoothness: f64,
-    pub path_progress_reward: f64,
-    pub path_distance_penalty: f64,
-    pub step_size_penalty: f64,
+    pub path_progress_smoothness: f32,
+    pub path_progress_reward: f32,
+    pub path_distance_penalty: f32,
+    pub step_size_penalty: f32,
     pub walk_volume_coefficients: WalkVolumeCoefficients,
 }
 
@@ -123,7 +125,6 @@ impl<T: RealField + Euclid> PartialEq for Step<T> {
     }
 }
 
-#[cfg(test)]
 impl<T: approx::AbsDiffEq + RealField + Euclid> approx::AbsDiffEq for Step<T>
 where
     T::Epsilon: Copy,
@@ -135,8 +136,6 @@ where
     }
 
     fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
-        use crate::geometry::Angle;
-
         self.forward.abs_diff_eq(&other.forward, epsilon)
             && self.left.abs_diff_eq(&other.left, epsilon)
             && Angle(self.turn).abs_diff_eq(&Angle(other.turn), epsilon)
@@ -164,15 +163,9 @@ impl<T: RealField> Step<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::FRAC_PI_2;
+    use linear_algebra::{point, Point2};
 
-    use approx::assert_abs_diff_eq;
-    use nalgebra::{point, vector, Point2};
-
-    use crate::{
-        geometry::{Angle, Pose},
-        step_plan::Step,
-    };
+    use crate::{geometry::Pose, step_plan::Step};
 
     #[test]
     fn test_pose_step_addition() {
@@ -193,11 +186,5 @@ mod tests {
                 orientation: 3.0
             }
         );
-    }
-
-    #[test]
-    fn test_vector_rotation() {
-        assert_abs_diff_eq!(Angle(0.0) * vector![1.0, 2.0], vector![1.0, 2.0]);
-        assert_abs_diff_eq!(Angle(FRAC_PI_2) * vector![1.0, 2.0], vector![-2.0, 1.0]);
     }
 }

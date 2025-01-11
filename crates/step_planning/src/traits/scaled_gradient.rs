@@ -2,8 +2,11 @@ use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, Point2, Scalar, Vect
 use num_dual::{Derivative, DualNum};
 use num_traits::Float;
 
+use geometry::angle::Angle;
+use linear_algebra::Framed;
+
 use crate::{
-    geometry::{Angle, Pose},
+    geometry::Pose,
     loss_fields::step_planning::PlannedStepGradient,
     step_plan::{PlannedStep, Step},
 };
@@ -13,6 +16,17 @@ where
     DefaultAllocator: Allocator<T, D>,
 {
     fn scaled_gradient(self, scale: S) -> Derivative<T, F, D, U1>;
+}
+
+impl<Frame, SelfInner, OtherInner, T: DualNum<F>, F: Float + Scalar, D: Dim>
+    ScaledGradient<T, F, D, Framed<Frame, OtherInner>> for Framed<Frame, SelfInner>
+where
+    DefaultAllocator: Allocator<T, D>,
+    SelfInner: ScaledGradient<T, F, D, OtherInner>,
+{
+    fn scaled_gradient(self, scale: Framed<Frame, OtherInner>) -> Derivative<T, F, D, U1> {
+        self.inner.scaled_gradient(scale.inner)
+    }
 }
 
 impl<T: DualNum<F>, F: Float + Scalar, D: Dim> ScaledGradient<T, F, D, Angle<T>>

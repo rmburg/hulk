@@ -2,11 +2,11 @@ use approx::{AbsDiffEq, RelativeEq};
 use path_serde::{PathDeserialize, PathIntrospect, PathSerialize};
 use serde::{Deserialize, Serialize};
 
-use linear_algebra::{distance, vector, Point2};
+use linear_algebra::{distance, vector, Point2, Vector2};
 
 use crate::{
-    angle::Angle, arc::Arc, circle_tangents::CircleTangents, line_segment::LineSegment,
-    rectangle::Rectangle, two_line_segments::TwoLineSegments, Distance,
+    angle::Angle, arc::Arc, circle_tangents::CircleTangents, direction::Direction,
+    line_segment::LineSegment, rectangle::Rectangle, two_line_segments::TwoLineSegments, Distance,
 };
 
 #[derive(
@@ -213,6 +213,20 @@ where
 
     pub fn point_at_angle(&self, angle: Angle<f32>) -> Point2<Frame> {
         self.center + angle.as_direction() * self.radius
+    }
+
+    pub fn tangent(&self, angle: Angle<f32>, direction: Direction) -> Vector2<Frame> {
+        let radius = angle.as_direction::<Frame>();
+
+        match direction {
+            Direction::Clockwise => {
+                vector![radius.y(), -radius.x()]
+            }
+            Direction::Counterclockwise => {
+                vector![-radius.y(), radius.x()]
+            }
+            Direction::Colinear => Vector2::zeros(),
+        }
     }
 }
 

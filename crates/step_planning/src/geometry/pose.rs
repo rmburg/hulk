@@ -3,16 +3,18 @@ use std::{
     ops::{Add, AddAssign},
 };
 
-use nalgebra::{vector, Point2, RealField, Rotation2, Scalar};
-use num_traits::Euclid;
+use nalgebra::{RealField, Scalar};
+use num_traits::{Euclid, Zero};
 
+use coordinate_systems::Ground;
+use linear_algebra::{Point2, Rotation2, Vector2};
 use types::support_foot::Side;
 
 use crate::step_plan::Step;
 
 #[derive(Clone, Debug)]
 pub struct Pose<T: Scalar> {
-    pub position: Point2<T>,
+    pub position: Point2<Ground, T>,
     pub orientation: T,
 }
 
@@ -52,7 +54,9 @@ impl<T: RealField> Add<Step<T>> for Pose<T> {
         } = step;
 
         Self {
-            position: position + (Rotation2::new(orientation.clone()) * vector![forward, left]),
+            position: position
+                + (Rotation2::new(orientation.clone())
+                    * Vector2::<Ground, T>::wrap(nalgebra::vector![forward, left])),
             orientation: orientation + turn,
         }
     }

@@ -42,9 +42,9 @@ struct StepPlanningProblem {
 }
 
 impl CostFunction for StepPlanningProblem {
-    type Param = Vec<f64>;
+    type Param = Vec<f32>;
 
-    type Output = f64;
+    type Output = f32;
 
     fn cost(&self, param: &Self::Param) -> Result<Self::Output, ArgminError> {
         let step_planning_loss = self.step_planning.loss_field();
@@ -87,7 +87,7 @@ impl Gradient for StepPlanningProblem {
     type Gradient = Self::Param;
 
     fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, ArgminError> {
-        let param_array: [f64; NUM_VARIABLES] = param.as_slice().try_into().unwrap();
+        let param_array: [f32; NUM_VARIABLES] = param.as_slice().try_into().unwrap();
 
         let dual_param = duals(&param_array);
 
@@ -95,7 +95,7 @@ impl Gradient for StepPlanningProblem {
 
         let step_plan = StepPlan::from(dual_param.as_slice());
 
-        let gradient: SVector<f64, NUM_VARIABLES> = self
+        let gradient: SVector<f32, NUM_VARIABLES> = self
             .step_planning
             .planned_steps(
                 self.step_planning
@@ -122,9 +122,9 @@ impl Gradient for StepPlanningProblem {
 
 pub fn plan_steps(
     path: Path,
-    initial_pose: Pose<f64>,
+    initial_pose: Pose<f32>,
     initial_support_foot: Side,
-) -> Result<Vec<PlannedStep<f64>>> {
+) -> Result<Vec<PlannedStep<f32>>> {
     let line_search = MoreThuenteLineSearch::new();
     let solver = LBFGS::new(line_search, 10);
 

@@ -1,4 +1,5 @@
-use nalgebra::{Point2, Vector2};
+use coordinate_systems::Ground;
+use linear_algebra::{Point2, Vector2};
 
 use crate::{
     geometry::Path,
@@ -8,13 +9,13 @@ use crate::{
 
 pub struct PathProgressField<'a> {
     pub path: &'a Path,
-    pub smoothness: f64,
+    pub smoothness: f32,
 }
 
 impl<'a> LossField for PathProgressField<'a> {
-    type Parameter = Point2<f64>;
-    type Gradient = Vector2<f64>;
-    type Loss = f64;
+    type Parameter = Point2<Ground>;
+    type Gradient = Vector2<Ground>;
+    type Loss = f32;
 
     fn loss(&self, point: Self::Parameter) -> Self::Loss {
         let progress = self.path.progress(point);
@@ -36,13 +37,15 @@ impl<'a> LossField for PathProgressField<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
+    use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
     use approx::assert_abs_diff_eq;
-    use nalgebra::{point, vector};
+
+    use geometry::{angle::Angle, circle::Circle, direction::Direction};
+    use linear_algebra::{point, vector};
 
     use crate::{
-        geometry::{Angle, Arc, Circle, Direction, LineSegment, Path, PathSegment},
+        geometry::{Arc, LineSegment, Path, PathSegment},
         loss_fields::path_progress::PathProgressField,
         traits::LossField,
     };
@@ -124,7 +127,7 @@ mod tests {
         let loss_7 = loss_field.loss(sample_point_7);
         let grad_7 = loss_field.grad(sample_point_7);
 
-        assert_abs_diff_eq!(loss_7, loss_3 - FRAC_PI_4);
+        assert_abs_diff_eq!(loss_7, loss_3 - FRAC_PI_4, epsilon = 1e-6);
         assert_abs_diff_eq!(grad_7, vector![-0.5, -0.5]);
     }
 }
