@@ -3077,6 +3077,7 @@ dependencies = [
  "coordinate_systems",
  "linear_algebra",
  "nalgebra",
+ "num-traits",
  "path_serde",
  "serde",
 ]
@@ -6609,6 +6610,7 @@ version = "0.1.0"
 dependencies = [
  "approx",
  "color-eyre",
+ "geometry",
  "itertools 0.10.5",
  "nalgebra",
  "num-dual",
@@ -6623,6 +6625,7 @@ dependencies = [
  "argmin",
  "argmin-math",
  "color-eyre",
+ "geometry",
  "nalgebra",
  "num-dual",
  "step_planning",

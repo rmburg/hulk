@@ -36,10 +36,11 @@ mod tests {
     use std::f64::consts::{FRAC_PI_2, SQRT_2};
 
     use approx::assert_abs_diff_eq;
+    use geometry::{angle::Angle, direction::Direction};
     use nalgebra::{point, vector, Vector2};
 
     use crate::{
-        geometry::{Angle, Arc, Circle, Direction, LineSegment, Path, PathSegment},
+        geometry::{Arc, Circle, LineSegment, Path, PathSegment},
         loss_fields::path_distance::PathDistanceField,
         traits::LossField,
     };

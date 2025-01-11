@@ -4,8 +4,10 @@ use nalgebra::{
 use num_dual::{Derivative, DualNum, DualVec};
 use num_traits::Float;
 
+use geometry::angle::Angle;
+
 use crate::{
-    geometry::{pose::PoseAndSupportFoot, Angle, Pose},
+    geometry::{pose::PoseAndSupportFoot, Pose},
     loss_fields::step_size::StepAndSupportFoot,
     step_plan::{PlannedStep, Step},
 };

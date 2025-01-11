@@ -9,6 +9,7 @@ homepage.workspace = true
 argmin.workspace = true
 argmin-math.workspace = true
 color-eyre.workspace = true
+geometry.workspace = true
 nalgebra.workspace = true
 num-dual.workspace = true
 step_planning.workspace = true

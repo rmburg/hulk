@@ -1,7 +1,9 @@
 use nalgebra::{Point2, Vector2};
 
+use geometry::angle::Angle;
+
 use crate::{
-    geometry::{path::ArcProjectionKind, Angle, Arc, LineSegment, Path, PathSegment},
+    geometry::{path::ArcProjectionKind, Arc, LineSegment, Path, PathSegment},
     traits::{Length, Project},
 };
 

@@ -3,7 +3,7 @@ use std::ops::{Add, Div, Mul, Sub};
 use nalgebra::{vector, RealField, Rotation2, Vector2};
 use num_traits::Euclid;
 
-use crate::geometry::path::Direction;
+use crate::direction::Direction;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Angle<T>(pub T);
@@ -24,7 +24,6 @@ impl<T: Euclid + RealField> PartialEq for Angle<T> {
     }
 }
 
-#[cfg(test)]
 impl<T: Euclid + RealField + Clone> approx::AbsDiffEq for Angle<T> {
     type Epsilon = T::Epsilon;
 

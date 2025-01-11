@@ -2,8 +2,10 @@ use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, Point2, Scalar, Vect
 use num_dual::{Derivative, DualNum};
 use num_traits::Float;
 
+use geometry::angle::Angle;
+
 use crate::{
-    geometry::{Angle, Pose},
+    geometry::Pose,
     loss_fields::step_planning::PlannedStepGradient,
     step_plan::{PlannedStep, Step},
 };

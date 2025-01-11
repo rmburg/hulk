@@ -1,27 +1,8 @@
-use std::ops::Neg;
-
+use geometry::{angle::Angle, direction::Direction};
 use nalgebra::{vector, Point2, RealField, Vector2};
-use num_traits::One;
-
-use crate::geometry::Angle;
 
 #[derive(Clone)]
 pub struct LineSegment(pub Point2<f64>, pub Point2<f64>);
-
-#[derive(Clone, Copy, Debug)]
-pub enum Direction {
-    Clockwise,
-    Counterclockwise,
-}
-
-impl Direction {
-    pub fn angle_sign<T: One + Neg<Output = T>>(self) -> T {
-        match self {
-            Direction::Clockwise => -T::one(),
-            Direction::Counterclockwise => T::one(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Circle {
@@ -48,6 +29,7 @@ impl Circle {
             Direction::Counterclockwise => {
                 vector![-radius.y, radius.x]
             }
+            Direction::Colinear => Vector2::zeros(),
         }
     }
 }

@@ -2,6 +2,8 @@ use std::ops::Mul;
 
 use nalgebra::{RealField, Scalar};
 use num_traits::Euclid;
+
+use geometry::angle::Angle;
 use types::support_foot::Side;
 
 use crate::{
@@ -128,7 +130,6 @@ impl<T: RealField + Euclid> PartialEq for Step<T> {
     }
 }
 
-#[cfg(test)]
 impl<T: approx::AbsDiffEq + RealField + Euclid> approx::AbsDiffEq for Step<T>
 where
     T::Epsilon: Copy,
@@ -140,8 +141,6 @@ where
     }
 
     fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
-        use crate::geometry::Angle;
-
         self.forward.abs_diff_eq(&other.forward, epsilon)
             && self.left.abs_diff_eq(&other.left, epsilon)
             && Angle(self.turn).abs_diff_eq(&Angle(other.turn), epsilon)
@@ -174,10 +173,9 @@ mod tests {
     use approx::assert_abs_diff_eq;
     use nalgebra::{point, vector, Point2};
 
-    use crate::{
-        geometry::{Angle, Pose},
-        step_plan::Step,
-    };
+    use geometry::angle::Angle;
+
+    use crate::{geometry::Pose, step_plan::Step};
 
     #[test]
     fn test_pose_step_addition() {
