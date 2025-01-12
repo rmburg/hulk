@@ -1,4 +1,7 @@
-use crate::geometry::{Arc, LineSegment, Path, PathSegment};
+use coordinate_systems::Ground;
+use geometry::line_segment::LineSegment;
+
+use crate::geometry::{Arc, Path, PathSegment};
 
 pub trait Length {
     fn length(&self) -> f32;
@@ -19,7 +22,7 @@ impl Length for PathSegment {
     }
 }
 
-impl Length for LineSegment {
+impl Length for LineSegment<Ground> {
     fn length(&self) -> f32 {
         let Self(start, end) = self;
 

@@ -1,9 +1,9 @@
 use coordinate_systems::Ground;
-use geometry::angle::Angle;
+use geometry::{angle::Angle, line_segment::LineSegment};
 use linear_algebra::{Point2, Vector2};
 
 use crate::{
-    geometry::{path::ArcProjectionKind, Arc, LineSegment, Path, PathSegment},
+    geometry::{path::ArcProjectionKind, Arc, Path, PathSegment},
     traits::{Length, Project},
 };
 
@@ -12,7 +12,7 @@ pub trait PathProgress {
     fn forward(&self, point: Point2<Ground>) -> Vector2<Ground>;
 }
 
-impl PathProgress for LineSegment {
+impl PathProgress for LineSegment<Ground> {
     fn progress(&self, point: Point2<Ground>) -> f32 {
         let Self(start, end) = self;
         let start_to_point = point - start;

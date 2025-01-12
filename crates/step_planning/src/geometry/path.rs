@@ -1,9 +1,6 @@
 use coordinate_systems::Ground;
-use geometry::{angle::Angle, circle::Circle, direction::Direction};
+use geometry::{angle::Angle, circle::Circle, direction::Direction, line_segment::LineSegment};
 use linear_algebra::Point2;
-
-#[derive(Clone)]
-pub struct LineSegment(pub Point2<Ground>, pub Point2<Ground>);
 
 #[derive(Debug, Clone)]
 pub struct Arc {
@@ -52,7 +49,7 @@ impl Arc {
 
 #[derive(Clone)]
 pub enum PathSegment {
-    LineSegment(LineSegment),
+    LineSegment(LineSegment<Ground>),
     Arc(Arc),
 }
 

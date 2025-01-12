@@ -1,7 +1,8 @@
 use coordinate_systems::Ground;
+use geometry::line_segment::LineSegment;
 use linear_algebra::Point2;
 
-use crate::geometry::{path::ArcProjectionKind, Arc, LineSegment, Path, PathSegment};
+use crate::geometry::{path::ArcProjectionKind, Arc, Path, PathSegment};
 
 pub trait Project {
     /// Project `point` onto `self`.
@@ -36,7 +37,7 @@ impl Project for PathSegment {
     }
 }
 
-impl Project for LineSegment {
+impl Project for LineSegment<Ground> {
     fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         let direction = self.1 - self.0;
         let v = point - self.0;
