@@ -6610,8 +6610,10 @@ version = "0.1.0"
 dependencies = [
  "approx",
  "color-eyre",
+ "coordinate_systems",
  "geometry",
  "itertools 0.10.5",
+ "linear_algebra",
  "nalgebra",
  "num-dual",
  "num-traits",
@@ -6626,6 +6628,7 @@ dependencies = [
  "argmin-math",
  "color-eyre",
  "geometry",
+ "linear_algebra",
  "nalgebra",
  "num-dual",
  "step_planning",

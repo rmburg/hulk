@@ -36,10 +36,10 @@ impl<'a, T: RealField> StepPlan<'a, T> {
 pub struct StepPlanning {
     pub path: Path,
     pub initial_support_foot: Side,
-    pub path_progress_smoothness: f64,
-    pub path_progress_reward: f64,
-    pub path_distance_penalty: f64,
-    pub step_size_penalty: f64,
+    pub path_progress_smoothness: f32,
+    pub path_progress_reward: f32,
+    pub path_distance_penalty: f32,
+    pub step_size_penalty: f32,
     pub walk_volume_coefficients: WalkVolumeCoefficients,
 }
 
@@ -168,12 +168,12 @@ impl<T: RealField> Step<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::FRAC_PI_2;
+    use std::f32::consts::FRAC_PI_2;
 
     use approx::assert_abs_diff_eq;
-    use nalgebra::{point, vector, Point2};
 
     use geometry::angle::Angle;
+    use linear_algebra::{point, vector, Point2};
 
     use crate::{geometry::Pose, step_plan::Step};
 

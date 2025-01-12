@@ -13,6 +13,4 @@ nalgebra = { workspace = true }
 num-traits = { workspace = true }
 path_serde = { workspace = true }
 serde = { workspace = true }
-
-[dev-dependencies]
 coordinate_systems = { workspace = true }

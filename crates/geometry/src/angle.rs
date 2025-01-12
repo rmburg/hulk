@@ -1,7 +1,10 @@
 use std::ops::{Add, Div, Mul, Sub};
 
-use nalgebra::{vector, RealField, Rotation2, Vector2};
+use nalgebra::RealField;
 use num_traits::Euclid;
+
+use coordinate_systems::Ground;
+use linear_algebra::{vector, Rotation2, Vector2};
 
 use crate::direction::Direction;
 
@@ -53,7 +56,7 @@ impl<T: RealField + Euclid> Angle<T> {
         ((to - self.clone()) * direction.angle_sign::<T>()).normalized()
     }
 
-    pub fn as_direction(&self) -> Vector2<T> {
+    pub fn as_direction(&self) -> Vector2<Ground, T> {
         vector![self.cos(), self.sin()]
     }
 }
@@ -89,10 +92,10 @@ impl<T: Mul<Output = T>> Mul<T> for Angle<T> {
     }
 }
 
-impl<T: RealField> Mul<Vector2<T>> for Angle<T> {
-    type Output = Vector2<T>;
+impl<T: RealField> Mul<Vector2<Ground, T>> for Angle<T> {
+    type Output = Vector2<Ground, T>;
 
-    fn mul(self, rhs: Vector2<T>) -> Self::Output {
+    fn mul(self, rhs: Vector2<Ground, T>) -> Self::Output {
         Rotation2::new(self.0) * rhs
     }
 }

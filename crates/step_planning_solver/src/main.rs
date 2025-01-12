@@ -1,9 +1,9 @@
-use std::f64::consts::FRAC_PI_2;
+use std::f32::consts::FRAC_PI_2;
 
 use color_eyre::Result;
-use nalgebra::point;
 
 use geometry::{angle::Angle, direction::Direction};
+use linear_algebra::point;
 use step_planning::geometry::{Arc, Circle, LineSegment, Path, PathSegment};
 use step_planning_solver::plan_steps;
 use types::support_foot::Side;

@@ -1,4 +1,5 @@
-use nalgebra::{Point2, Vector2};
+use coordinate_systems::Ground;
+use linear_algebra::{Point2, Vector2};
 
 use crate::{
     geometry::Path,
@@ -10,9 +11,9 @@ pub struct PathDistanceField<'a> {
 }
 
 impl<'a> LossField for PathDistanceField<'a> {
-    type Parameter = Point2<f64>;
-    type Gradient = Vector2<f64>;
-    type Loss = f64;
+    type Parameter = Point2<Ground>;
+    type Gradient = Vector2<Ground>;
+    type Loss = f32;
 
     fn loss(&self, point: Self::Parameter) -> Self::Loss {
         let projection = self.path.project(point);
@@ -33,11 +34,12 @@ impl<'a> LossField for PathDistanceField<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::{FRAC_PI_2, SQRT_2};
+    use std::f32::consts::{FRAC_PI_2, SQRT_2};
 
     use approx::assert_abs_diff_eq;
+
     use geometry::{angle::Angle, direction::Direction};
-    use nalgebra::{point, vector, Vector2};
+    use linear_algebra::{point, vector, Vector2};
 
     use crate::{
         geometry::{Arc, Circle, LineSegment, Path, PathSegment},

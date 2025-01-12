@@ -5,6 +5,7 @@ use num_dual::{Derivative, DualNum, DualVec};
 use num_traits::Float;
 
 use geometry::angle::Angle;
+use linear_algebra::{Framed, IntoFramed};
 
 use crate::{
     geometry::{pose::PoseAndSupportFoot, Pose},
@@ -18,6 +19,24 @@ pub trait WrapDual<Dual> {
 
 pub trait UnwrapDual<Real, Gradient> {
     fn unwrap_dual(self) -> (Real, Gradient);
+}
+
+impl<Frame, SelfInner: WrapDual<OtherInner>, OtherInner> WrapDual<Framed<Frame, OtherInner>>
+    for Framed<Frame, SelfInner>
+{
+    fn wrap_dual(self) -> Framed<Frame, OtherInner> {
+        self.inner.wrap_dual().framed()
+    }
+}
+
+impl<Frame, SelfInner: UnwrapDual<Real, Gradient>, Real, Gradient>
+    UnwrapDual<Framed<Frame, Real>, Framed<Frame, Gradient>> for Framed<Frame, SelfInner>
+{
+    fn unwrap_dual(self) -> (Framed<Frame, Real>, Framed<Frame, Gradient>) {
+        let (real, gradient) = self.inner.unwrap_dual();
+
+        (real.framed(), gradient.framed())
+    }
 }
 
 impl<T: DualNum<F>, F, D: Dim> WrapDual<DualVec<T, F, D>> for T

@@ -1,4 +1,5 @@
-use nalgebra::{Point2, Vector2};
+use coordinate_systems::Ground;
+use linear_algebra::{Point2, Vector2};
 
 use crate::{
     geometry::Path,
@@ -8,13 +9,13 @@ use crate::{
 
 pub struct PathProgressField<'a> {
     pub path: &'a Path,
-    pub smoothness: f64,
+    pub smoothness: f32,
 }
 
 impl<'a> LossField for PathProgressField<'a> {
-    type Parameter = Point2<f64>;
-    type Gradient = Vector2<f64>;
-    type Loss = f64;
+    type Parameter = Point2<Ground>;
+    type Gradient = Vector2<Ground>;
+    type Loss = f32;
 
     fn loss(&self, point: Self::Parameter) -> Self::Loss {
         let progress = self.path.progress(point);
@@ -36,11 +37,12 @@ impl<'a> LossField for PathProgressField<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4};
+    use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
     use approx::assert_abs_diff_eq;
+
     use geometry::{angle::Angle, direction::Direction};
-    use nalgebra::{point, vector};
+    use linear_algebra::{point, vector};
 
     use crate::{
         geometry::{Arc, Circle, LineSegment, Path, PathSegment},

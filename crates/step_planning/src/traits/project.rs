@@ -1,15 +1,16 @@
-use nalgebra::Point2;
+use coordinate_systems::Ground;
+use linear_algebra::Point2;
 
 use crate::geometry::{path::ArcProjectionKind, Arc, LineSegment, Path, PathSegment};
 
 pub trait Project {
     /// Project `point` onto `self`.
     /// In other words, find the point closest to `point` in `self`
-    fn project(&self, point: Point2<f64>) -> Point2<f64>;
+    fn project(&self, point: Point2<Ground>) -> Point2<Ground>;
 }
 
 impl Project for Path {
-    fn project(&self, point: Point2<f64>) -> Point2<f64> {
+    fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         let (projected_point, _distance) = self
             .segments
             .iter()
@@ -27,7 +28,7 @@ impl Project for Path {
 }
 
 impl Project for PathSegment {
-    fn project(&self, point: Point2<f64>) -> Point2<f64> {
+    fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         match self {
             PathSegment::LineSegment(line_segment) => line_segment.project(point),
             PathSegment::Arc(arc) => arc.project(point),
@@ -36,17 +37,17 @@ impl Project for PathSegment {
 }
 
 impl Project for LineSegment {
-    fn project(&self, point: Point2<f64>) -> Point2<f64> {
+    fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         let direction = self.1 - self.0;
         let v = point - self.0;
-        let t = v.dot(&direction) / direction.magnitude_squared();
+        let t = v.dot(&direction) / direction.inner.magnitude_squared();
 
         self.0 + direction * t.clamp(0.0, 1.0)
     }
 }
 
 impl Project for Arc {
-    fn project(&self, point: Point2<f64>) -> Point2<f64> {
+    fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         match self.classify_point(point) {
             ArcProjectionKind::OnArc => {
                 let center_to_point = point - self.circle.center;

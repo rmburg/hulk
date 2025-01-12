@@ -8,30 +8,30 @@ pub struct StepSizeField {
 
 #[derive(Clone)]
 pub struct WalkVolumeCoefficients {
-    pub forward_cost: f64,
-    pub backward_cost: f64,
-    pub outward_cost: f64,
-    pub inward_cost: f64,
-    pub outward_rotation_cost: f64,
-    pub inward_rotation_cost: f64,
-    pub translation_exponent: f64,
-    pub rotation_exponent: f64,
+    pub forward_cost: f32,
+    pub backward_cost: f32,
+    pub outward_cost: f32,
+    pub inward_cost: f32,
+    pub outward_rotation_cost: f32,
+    pub inward_rotation_cost: f32,
+    pub translation_exponent: f32,
+    pub rotation_exponent: f32,
 }
 
 pub struct WalkVolumeExtents {
-    pub forward: f64,
-    pub backward: f64,
-    pub outward: f64,
-    pub inward: f64,
-    pub outward_rotation: f64,
-    pub inward_rotation: f64,
+    pub forward: f32,
+    pub backward: f32,
+    pub outward: f32,
+    pub inward: f32,
+    pub outward_rotation: f32,
+    pub inward_rotation: f32,
 }
 
 impl WalkVolumeCoefficients {
     pub fn from_extents_and_exponents(
         extents: &WalkVolumeExtents,
-        translation_exponent: f64,
-        rotation_exponent: f64,
+        translation_exponent: f32,
+        rotation_exponent: f32,
     ) -> Self {
         let WalkVolumeExtents {
             forward,
@@ -58,8 +58,8 @@ impl WalkVolumeCoefficients {
 impl WalkVolumeCoefficients {
     fn costs(
         &self,
-        StepAndSupportFoot { step, support_foot }: &StepAndSupportFoot<f64>,
-    ) -> Step<f64> {
+        StepAndSupportFoot { step, support_foot }: &StepAndSupportFoot<f32>,
+    ) -> Step<f32> {
         let Self {
             forward_cost: positive_forward_cost,
             backward_cost: negative_forward_cost,
@@ -115,7 +115,7 @@ impl WalkVolumeCoefficients {
 }
 
 #[inline]
-fn positive_negative(value: f64, positive: f64, negative: f64) -> f64 {
+fn positive_negative(value: f32, positive: f32, negative: f32) -> f32 {
     if value.is_sign_positive() {
         positive
     } else {
@@ -124,9 +124,9 @@ fn positive_negative(value: f64, positive: f64, negative: f64) -> f64 {
 }
 
 fn walk_volume(
-    step: &StepAndSupportFoot<f64>,
+    step: &StepAndSupportFoot<f32>,
     walk_volume_coefficients: &WalkVolumeCoefficients,
-) -> f64 {
+) -> f32 {
     let costs = walk_volume_coefficients.costs(step);
 
     let normalized_forward = step.step.forward * costs.forward;
@@ -147,9 +147,9 @@ fn walk_volume(
 }
 
 fn walk_volume_gradient(
-    step: &StepAndSupportFoot<f64>,
+    step: &StepAndSupportFoot<f32>,
     walk_volume_coefficients: &WalkVolumeCoefficients,
-) -> Step<f64> {
+) -> Step<f32> {
     let costs = walk_volume_coefficients.costs(step);
 
     let normalized_forward = (step.step.forward * costs.forward).abs();
@@ -203,11 +203,11 @@ fn walk_volume_gradient(
     }
 }
 
-fn penalty_function(walk_volume_value: f64) -> f64 {
+fn penalty_function(walk_volume_value: f32) -> f32 {
     walk_volume_value.powi(6)
 }
 
-fn penalty_function_derivative(walk_volume_value: f64) -> f64 {
+fn penalty_function_derivative(walk_volume_value: f32) -> f32 {
     walk_volume_value.powi(5) * 6.0
 }
 
@@ -218,9 +218,9 @@ pub struct StepAndSupportFoot<T> {
 }
 
 impl LossField for StepSizeField {
-    type Parameter = StepAndSupportFoot<f64>;
-    type Gradient = Step<f64>;
-    type Loss = f64;
+    type Parameter = StepAndSupportFoot<f32>;
+    type Gradient = Step<f32>;
+    type Loss = f32;
 
     fn loss(&self, step: Self::Parameter) -> Self::Loss {
         let value = walk_volume(&step, &self.walk_volume_coefficients);

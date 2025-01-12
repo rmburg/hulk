@@ -1,33 +1,36 @@
+use nalgebra::RealField;
+
+use coordinate_systems::Ground;
 use geometry::{angle::Angle, direction::Direction};
-use nalgebra::{vector, Point2, RealField, Vector2};
+use linear_algebra::{vector, Point2, Vector2};
 
 #[derive(Clone)]
-pub struct LineSegment(pub Point2<f64>, pub Point2<f64>);
+pub struct LineSegment(pub Point2<Ground>, pub Point2<Ground>);
 
 #[derive(Debug, Clone)]
 pub struct Circle {
-    pub center: Point2<f64>,
-    pub radius: f64,
+    pub center: Point2<Ground>,
+    pub radius: f32,
 }
 
 impl Circle {
-    pub fn point_at_angle(&self, angle: Angle<f64>) -> Point2<f64> {
+    pub fn point_at_angle(&self, angle: Angle<f32>) -> Point2<Ground> {
         self.center + angle.as_direction() * self.radius
     }
 
-    pub fn circumference(&self) -> f64 {
-        f64::two_pi() * self.radius
+    pub fn circumference(&self) -> f32 {
+        f32::two_pi() * self.radius
     }
 
-    pub fn tangent(&self, angle: Angle<f64>, direction: Direction) -> Vector2<f64> {
+    pub fn tangent(&self, angle: Angle<f32>, direction: Direction) -> Vector2<Ground> {
         let radius = angle.as_direction();
 
         match direction {
             Direction::Clockwise => {
-                vector![radius.y, -radius.x]
+                vector![radius.y(), -radius.x()]
             }
             Direction::Counterclockwise => {
-                vector![-radius.y, radius.x]
+                vector![-radius.y(), radius.x()]
             }
             Direction::Colinear => Vector2::zeros(),
         }
@@ -37,8 +40,8 @@ impl Circle {
 #[derive(Debug, Clone)]
 pub struct Arc {
     pub circle: Circle,
-    pub start: Angle<f64>,
-    pub end: Angle<f64>,
+    pub start: Angle<f32>,
+    pub end: Angle<f32>,
     pub direction: Direction,
 }
 
@@ -49,9 +52,9 @@ pub enum ArcProjectionKind {
 }
 
 impl Arc {
-    pub fn classify_point(&self, point: Point2<f64>) -> ArcProjectionKind {
+    pub fn classify_point(&self, point: Point2<Ground>) -> ArcProjectionKind {
         let center_to_point = point - self.circle.center;
-        let angle = Angle::new(center_to_point.y.atan2(center_to_point.x));
+        let angle = Angle::new(center_to_point.y().atan2(center_to_point.x()));
 
         let angle_to_end = self.start.angle_to(self.end, self.direction);
         let angle_to_point = self.start.angle_to(angle, self.direction);

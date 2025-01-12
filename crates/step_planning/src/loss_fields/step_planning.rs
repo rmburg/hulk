@@ -12,11 +12,11 @@ use crate::{
 
 pub struct StepPlanningLossField<'a> {
     pub path_distance_field: PathDistanceField<'a>,
-    pub path_distance_penalty: f64,
+    pub path_distance_penalty: f32,
     pub path_progress_field: PathProgressField<'a>,
-    pub path_progress_reward: f64,
+    pub path_progress_reward: f32,
     pub step_size_field: StepSizeField,
-    pub step_size_penalty: f64,
+    pub step_size_penalty: f32,
 }
 
 pub struct PlannedStepGradient<T: Scalar> {
@@ -25,9 +25,9 @@ pub struct PlannedStepGradient<T: Scalar> {
 }
 
 impl<'a> LossField for StepPlanningLossField<'a> {
-    type Parameter = PlannedStep<f64>;
-    type Gradient = PlannedStepGradient<f64>;
-    type Loss = f64;
+    type Parameter = PlannedStep<f32>;
+    type Gradient = PlannedStepGradient<f32>;
+    type Loss = f32;
 
     fn loss(&self, parameter: Self::Parameter) -> Self::Loss {
         let PlannedStep { pose, step } = parameter;
@@ -52,7 +52,7 @@ impl<'a> LossField for StepPlanningLossField<'a> {
 
         PlannedStepGradient {
             pose: Pose {
-                position: (distance_loss_gradient + progress_loss_gradient).into(),
+                position: (distance_loss_gradient + progress_loss_gradient).as_point(),
                 orientation: 0.0,
             },
             step: step_size_loss,
