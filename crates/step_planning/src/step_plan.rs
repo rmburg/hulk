@@ -4,10 +4,10 @@ use nalgebra::{RealField, Scalar};
 use num_traits::Euclid;
 
 use geometry::angle::Angle;
-use types::support_foot::Side;
+use types::{planned_path::Path, support_foot::Side};
 
 use crate::{
-    geometry::{pose::PoseAndSupportFoot, Path, Pose},
+    geometry::{pose::PoseAndSupportFoot, Pose},
     loss_fields::{
         path_distance::PathDistanceField,
         path_progress::PathProgressField,

@@ -4,9 +4,7 @@ use geometry::{
     line_segment::LineSegment,
 };
 use linear_algebra::Point2;
-use types::planned_path::PathSegment;
-
-use crate::geometry::Path;
+use types::planned_path::{Path, PathSegment};
 
 pub trait Project<Frame> {
     /// Project `point` onto `self`.

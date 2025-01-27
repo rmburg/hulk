@@ -5,9 +5,9 @@ use geometry::{
     line_segment::LineSegment,
 };
 use linear_algebra::{Point2, Vector2};
-use types::planned_path::PathSegment;
+use types::planned_path::{Path, PathSegment};
 
-use crate::{geometry::Path, traits::Project};
+use crate::traits::Project;
 
 pub trait PathProgress {
     fn progress(&self, point: Point2<Ground>) -> f32;

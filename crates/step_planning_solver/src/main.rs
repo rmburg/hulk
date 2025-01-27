@@ -6,9 +6,11 @@ use geometry::{
     angle::Angle, arc::Arc, circle::Circle, direction::Direction, line_segment::LineSegment,
 };
 use linear_algebra::point;
-use step_planning::geometry::Path;
 use step_planning_solver::plan_steps;
-use types::{planned_path::PathSegment, support_foot::Side};
+use types::{
+    planned_path::{Path, PathSegment},
+    support_foot::Side,
+};
 
 fn main() -> Result<()> {
     color_eyre::install()?;

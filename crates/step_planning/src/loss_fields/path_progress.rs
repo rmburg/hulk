@@ -1,8 +1,8 @@
 use coordinate_systems::Ground;
 use linear_algebra::{Point2, Vector2};
+use types::planned_path::Path;
 
 use crate::{
-    geometry::Path,
     traits::{Length, LossField, PathProgress},
     utils::{smoothmin, smoothmin_derivative},
 };
@@ -45,9 +45,9 @@ mod tests {
         angle::Angle, arc::Arc, circle::Circle, direction::Direction, line_segment::LineSegment,
     };
     use linear_algebra::{point, vector};
-    use types::planned_path::PathSegment;
+    use types::planned_path::{Path, PathSegment};
 
-    use crate::{geometry::Path, loss_fields::path_progress::PathProgressField, traits::LossField};
+    use crate::{loss_fields::path_progress::PathProgressField, traits::LossField};
 
     fn test_path() -> Path {
         Path {

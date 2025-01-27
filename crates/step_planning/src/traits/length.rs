@@ -1,7 +1,5 @@
 use geometry::{arc::Arc, line_segment::LineSegment};
-use types::planned_path::PathSegment;
-
-use crate::geometry::Path;
+use types::planned_path::{Path, PathSegment};
 
 pub trait Length {
     fn length(&self) -> f32;
