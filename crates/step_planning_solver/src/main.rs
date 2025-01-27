@@ -2,11 +2,13 @@ use std::f32::consts::FRAC_PI_2;
 
 use color_eyre::Result;
 
-use geometry::{angle::Angle, circle::Circle, direction::Direction, line_segment::LineSegment};
+use geometry::{
+    angle::Angle, arc::Arc, circle::Circle, direction::Direction, line_segment::LineSegment,
+};
 use linear_algebra::point;
-use step_planning::geometry::{Arc, Path, PathSegment, Pose};
+use step_planning::geometry::Path;
 use step_planning_solver::plan_steps;
-use types::support_foot::Side;
+use types::{planned_path::PathSegment, support_foot::Side};
 
 fn main() -> Result<()> {
     color_eyre::install()?;

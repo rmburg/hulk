@@ -1,7 +1,7 @@
-use coordinate_systems::Ground;
-use geometry::line_segment::LineSegment;
+use geometry::{arc::Arc, line_segment::LineSegment};
+use types::planned_path::PathSegment;
 
-use crate::geometry::{Arc, Path, PathSegment};
+use crate::geometry::Path;
 
 pub trait Length {
     fn length(&self) -> f32;
@@ -22,7 +22,7 @@ impl Length for PathSegment {
     }
 }
 
-impl Length for LineSegment<Ground> {
+impl<Frame> Length for LineSegment<Frame> {
     fn length(&self) -> f32 {
         let Self(start, end) = self;
 
@@ -30,7 +30,7 @@ impl Length for LineSegment<Ground> {
     }
 }
 
-impl Length for Arc {
+impl<Frame> Length for Arc<Frame> {
     fn length(&self) -> f32 {
         let angle_start_to_end = self.start.angle_to(self.end, self.direction);
 

@@ -1,5 +1,5 @@
 pub mod path;
 pub mod pose;
 
-pub use path::{Arc, Path, PathSegment};
+pub use path::Path;
 pub use pose::Pose;

@@ -38,14 +38,13 @@ mod tests {
 
     use approx::assert_abs_diff_eq;
 
-    use geometry::{angle::Angle, circle::Circle, direction::Direction, line_segment::LineSegment};
-    use linear_algebra::{point, vector, Vector2};
-
-    use crate::{
-        geometry::{Arc, Path, PathSegment},
-        loss_fields::path_distance::PathDistanceField,
-        traits::LossField,
+    use geometry::{
+        angle::Angle, arc::Arc, circle::Circle, direction::Direction, line_segment::LineSegment,
     };
+    use linear_algebra::{point, vector, Vector2};
+    use types::planned_path::PathSegment;
+
+    use crate::{geometry::Path, loss_fields::path_distance::PathDistanceField, traits::LossField};
 
     fn test_path() -> Path {
         Path {

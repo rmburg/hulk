@@ -1,11 +1,13 @@
 use coordinate_systems::Ground;
-use geometry::{angle::Angle, line_segment::LineSegment};
-use linear_algebra::{Point2, Vector2};
-
-use crate::{
-    geometry::{path::ArcProjectionKind, Arc, Path, PathSegment},
-    traits::{Length, Project},
+use geometry::{
+    angle::Angle,
+    arc::{Arc, ArcProjectionKind},
+    line_segment::LineSegment,
 };
+use linear_algebra::{Point2, Vector2};
+use types::planned_path::PathSegment;
+
+use crate::{geometry::Path, traits::Project};
 
 pub trait PathProgress {
     fn progress(&self, point: Point2<Ground>) -> f32;
@@ -29,7 +31,7 @@ impl PathProgress for LineSegment<Ground> {
     }
 }
 
-impl PathProgress for Arc {
+impl PathProgress for Arc<Ground> {
     fn progress(&self, point: Point2<Ground>) -> f32 {
         match self.classify_point(point) {
             ArcProjectionKind::OnArc => {

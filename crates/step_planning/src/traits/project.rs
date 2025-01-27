@@ -1,16 +1,20 @@
 use coordinate_systems::Ground;
-use geometry::line_segment::LineSegment;
+use geometry::{
+    arc::{Arc, ArcProjectionKind},
+    line_segment::LineSegment,
+};
 use linear_algebra::Point2;
+use types::planned_path::PathSegment;
 
-use crate::geometry::{path::ArcProjectionKind, Arc, Path, PathSegment};
+use crate::geometry::Path;
 
-pub trait Project {
+pub trait Project<Frame> {
     /// Project `point` onto `self`.
     /// In other words, find the point closest to `point` in `self`
-    fn project(&self, point: Point2<Ground>) -> Point2<Ground>;
+    fn project(&self, point: Point2<Frame>) -> Point2<Frame>;
 }
 
-impl Project for Path {
+impl Project<Ground> for Path {
     fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         let (projected_point, _distance) = self
             .segments
@@ -28,7 +32,7 @@ impl Project for Path {
     }
 }
 
-impl Project for PathSegment {
+impl Project<Ground> for PathSegment {
     fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         match self {
             PathSegment::LineSegment(line_segment) => line_segment.project(point),
@@ -37,7 +41,7 @@ impl Project for PathSegment {
     }
 }
 
-impl Project for LineSegment<Ground> {
+impl Project<Ground> for LineSegment<Ground> {
     fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         let direction = self.1 - self.0;
         let v = point - self.0;
@@ -47,7 +51,7 @@ impl Project for LineSegment<Ground> {
     }
 }
 
-impl Project for Arc {
+impl Project<Ground> for Arc<Ground> {
     fn project(&self, point: Point2<Ground>) -> Point2<Ground> {
         match self.classify_point(point) {
             ArcProjectionKind::OnArc => {
