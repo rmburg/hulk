@@ -1,15 +1,18 @@
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::Result;
 use coordinate_systems::{Ground, UpcomingSupport};
 use serde::{Deserialize, Serialize};
 
 use context_attribute::context;
 use framework::{AdditionalOutput, MainOutput};
-use linear_algebra::{Isometry2, Orientation2, Pose2};
+use linear_algebra::Isometry2;
+use step_planning::geometry::Pose;
 use types::{
     motion_command::{MotionCommand, OrientationMode, WalkSpeed},
-    planned_path::PathSegment,
+    planned_path::{Path, PathSegment},
     step::Step,
+    support_foot::Side,
 };
+use walking_engine::mode::Mode;
 
 #[derive(Deserialize, Serialize)]
 pub struct StepPlanner {
@@ -34,6 +37,7 @@ pub struct CycleContext {
 
     ground_to_upcoming_support:
         CyclerState<Isometry2<Ground, UpcomingSupport>, "ground_to_upcoming_support">,
+    walking_engine_mode: CyclerState<Mode, "walking_engine_mode">,
 
     ground_to_upcoming_support_out:
         AdditionalOutput<Isometry2<Ground, UpcomingSupport>, "ground_to_upcoming_support">,
@@ -121,64 +125,32 @@ impl StepPlanner {
         &mut self,
         path: &[PathSegment],
         context: &CycleContext,
-        orientation_mode: &OrientationMode,
+        _orientation_mode: &OrientationMode, // TODO use orientation mode
     ) -> Result<Step> {
-        let segment = path
-            .iter()
-            .scan(0.0f32, |distance, segment| {
-                let result = if *distance < context.max_step_size.forward {
-                    Some(segment)
-                } else {
-                    None
-                };
-                *distance += segment.length();
-                result
-            })
-            .last()
-            .ok_or_else(|| eyre!("empty path provided"))?;
+        let current_support_foot = context
+            .walking_engine_mode
+            .support_side()
+            .unwrap_or(Side::Left);
 
-        let target_pose = match segment {
-            PathSegment::LineSegment(line_segment) => {
-                let direction = line_segment.1;
-                let rotation = if direction.coords().norm_squared() < f32::EPSILON {
-                    Orientation2::identity()
-                } else {
-                    let normalized_direction = direction.coords().normalize();
-                    Orientation2::from_cos_sin_unchecked(
-                        normalized_direction.x(),
-                        normalized_direction.y(),
-                    )
-                };
-                Pose2::from_parts(line_segment.1, rotation)
-            }
-            PathSegment::Arc(arc) => {
-                let start_point = arc.start_point();
-                let direction = arc
-                    .direction
-                    .rotate_vector_90_degrees(start_point - arc.circle.center);
-                Pose2::from_parts(
-                    start_point + direction,
-                    Orientation2::from_vector(direction),
-                )
-            }
-        };
-
-        let step_target = *context.ground_to_upcoming_support * target_pose;
-
-        Ok(Step {
-            forward: step_target.position().x(),
-            left: step_target.position().y(),
-            turn: match orientation_mode {
-                OrientationMode::AlignWithPath => step_target.orientation().angle(),
-                OrientationMode::Override(orientation) => {
-                    let ground_to_upcoming_support = context
-                        .ground_to_upcoming_support
-                        .orientation()
-                        .as_transform();
-                    (ground_to_upcoming_support * orientation).angle()
-                }
+        let step_plan = step_planning_solver::plan_steps(
+            Path {
+                // TODO skip this allocation
+                segments: path.to_vec(),
             },
-        })
+            upcoming_support_pose_in_ground(context),
+            current_support_foot.opposite(),
+        )?;
+
+        Ok(step_plan[0].step.step)
+    }
+}
+
+fn upcoming_support_pose_in_ground(context: &CycleContext) -> Pose<f32> {
+    let pose = context.ground_to_upcoming_support.inverse().as_pose();
+
+    Pose {
+        position: pose.position(),
+        orientation: pose.orientation().angle(),
     }
 }
 

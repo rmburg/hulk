@@ -1990,6 +1990,8 @@ dependencies = [
  "smallvec",
  "spl_network_messages",
  "splines",
+ "step_planning",
+ "step_planning_solver",
  "types",
  "walking_engine",
 ]

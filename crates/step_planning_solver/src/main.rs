@@ -6,6 +6,7 @@ use geometry::{
     angle::Angle, arc::Arc, circle::Circle, direction::Direction, line_segment::LineSegment,
 };
 use linear_algebra::point;
+use step_planning::geometry::Pose;
 use step_planning_solver::plan_steps;
 use types::{
     planned_path::{Path, PathSegment},

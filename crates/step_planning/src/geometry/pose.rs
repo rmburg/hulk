@@ -4,7 +4,7 @@ use std::{
 };
 
 use nalgebra::{RealField, Scalar};
-use num_traits::{Euclid, Zero};
+use num_traits::Euclid;
 
 use coordinate_systems::Ground;
 use linear_algebra::{Point2, Rotation2, Vector2};
