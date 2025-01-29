@@ -57,25 +57,72 @@ impl StepPlanner {
             .ground_to_upcoming_support_out
             .fill_if_subscribed(|| *context.ground_to_upcoming_support);
 
-        let (path, orientation_mode, speed) = match context.motion_command {
-            MotionCommand::Walk {
-                path,
-                orientation_mode,
-                speed,
-                ..
-            } => (path, orientation_mode, speed),
-            _ => {
-                return Ok(MainOutputs {
-                    planned_step: Step {
-                        forward: 0.0,
-                        left: 0.0,
-                        turn: 0.0,
-                    }
-                    .into(),
-                })
+        let MotionCommand::Walk {
+            path,
+            orientation_mode,
+            speed,
+            ..
+        } = context.motion_command
+        else {
+            return Ok(MainOutputs {
+                planned_step: Step {
+                    forward: 0.0,
+                    left: 0.0,
+                    turn: 0.0,
+                }
+                .into(),
+            });
+        };
+
+        let step = if let Some(injected_step) = context.injected_step {
+            *injected_step
+        } else {
+            self.plan_step(path, &context, orientation_mode)?
+        };
+
+        let step = self.clamp_step_size(&context, speed, step);
+
+        self.last_planned_step = step;
+
+        Ok(MainOutputs {
+            planned_step: step.into(),
+        })
+    }
+
+    fn clamp_step_size(&self, context: &CycleContext, speed: &WalkSpeed, step: Step) -> Step {
+        let initial_side_bonus = if self.last_planned_step.left == 0.0 {
+            Step {
+                forward: 0.0,
+                left: *context.initial_side_bonus,
+                turn: 0.0,
+            }
+        } else {
+            Step::default()
+        };
+
+        let max_step_size = match speed {
+            WalkSpeed::Slow => *context.max_step_size + *context.step_size_delta_slow,
+            WalkSpeed::Normal => *context.max_step_size + initial_side_bonus,
+            WalkSpeed::Fast => {
+                *context.max_step_size + *context.step_size_delta_fast + initial_side_bonus
             }
         };
 
+        clamp_step_to_walk_volume(
+            step,
+            &max_step_size,
+            *context.max_step_size_backwards,
+            *context.translation_exponent,
+            *context.rotation_exponent,
+        )
+    }
+
+    fn plan_step(
+        &mut self,
+        path: &[PathSegment],
+        context: &CycleContext,
+        orientation_mode: &OrientationMode,
+    ) -> Result<Step> {
         let segment = path
             .iter()
             .scan(0.0f32, |distance, segment| {
@@ -118,7 +165,7 @@ impl StepPlanner {
 
         let step_target = *context.ground_to_upcoming_support * target_pose;
 
-        let mut step = Step {
+        Ok(Step {
             forward: step_target.position().x(),
             left: step_target.position().y(),
             turn: match orientation_mode {
@@ -131,42 +178,6 @@ impl StepPlanner {
                     (ground_to_upcoming_support * orientation).angle()
                 }
             },
-        };
-
-        if let Some(injected_step) = context.injected_step {
-            step = *injected_step;
-        }
-
-        let initial_side_bonus = if self.last_planned_step.left == 0.0 {
-            Step {
-                forward: 0.0,
-                left: *context.initial_side_bonus,
-                turn: 0.0,
-            }
-        } else {
-            Step::default()
-        };
-
-        let max_step_size = match speed {
-            WalkSpeed::Slow => *context.max_step_size + *context.step_size_delta_slow,
-            WalkSpeed::Normal => *context.max_step_size + initial_side_bonus,
-            WalkSpeed::Fast => {
-                *context.max_step_size + *context.step_size_delta_fast + initial_side_bonus
-            }
-        };
-
-        let step = clamp_step_to_walk_volume(
-            step,
-            &max_step_size,
-            *context.max_step_size_backwards,
-            *context.translation_exponent,
-            *context.rotation_exponent,
-        );
-
-        self.last_planned_step = step;
-
-        Ok(MainOutputs {
-            planned_step: step.into(),
         })
     }
 }
