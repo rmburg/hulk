@@ -1,6 +1,9 @@
-use types::support_foot::Side;
+use types::{
+    step::{Step, StepAndSupportFoot},
+    support_foot::Side,
+};
 
-use crate::{step_plan::Step, traits::LossField};
+use crate::traits::LossField;
 
 pub struct StepSizeField {
     pub walk_volume_coefficients: WalkVolumeCoefficients,
@@ -209,12 +212,6 @@ fn penalty_function(walk_volume_value: f32) -> f32 {
 
 fn penalty_function_derivative(walk_volume_value: f32) -> f32 {
     walk_volume_value.powi(5) * 6.0
-}
-
-#[derive(Clone, Debug)]
-pub struct StepAndSupportFoot<T> {
-    pub step: Step<T>,
-    pub support_foot: Side,
 }
 
 impl LossField for StepSizeField {

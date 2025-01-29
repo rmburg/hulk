@@ -4,11 +4,10 @@ use num_traits::Float;
 
 use geometry::angle::Angle;
 use linear_algebra::Framed;
+use types::step::Step;
 
 use crate::{
-    geometry::Pose,
-    loss_fields::step_planning::PlannedStepGradient,
-    step_plan::{PlannedStep, Step},
+    geometry::Pose, loss_fields::step_planning::PlannedStepGradient, step_plan::PlannedStep,
 };
 
 pub trait ScaledGradient<T: DualNum<F>, F, D: Dim, S>

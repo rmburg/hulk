@@ -7499,6 +7499,7 @@ dependencies = [
  "image",
  "linear_algebra",
  "nalgebra",
+ "num-traits",
  "ordered-float",
  "path_serde",
  "serde",

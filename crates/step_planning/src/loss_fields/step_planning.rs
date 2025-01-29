@@ -1,12 +1,14 @@
 use nalgebra::Scalar;
 
+use types::step::Step;
+
 use crate::{
     geometry::Pose,
     loss_fields::{
         path_distance::PathDistanceField, path_progress::PathProgressField,
         step_size::StepSizeField,
     },
-    step_plan::{PlannedStep, Step},
+    step_plan::PlannedStep,
     traits::LossField,
 };
 

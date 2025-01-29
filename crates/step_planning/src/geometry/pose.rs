@@ -8,9 +8,7 @@ use num_traits::{Euclid, Zero};
 
 use coordinate_systems::Ground;
 use linear_algebra::{Point2, Rotation2, Vector2};
-use types::support_foot::Side;
-
-use crate::step_plan::Step;
+use types::{step::Step, support_foot::Side};
 
 #[derive(Clone, Debug)]
 pub struct Pose<T: Scalar> {

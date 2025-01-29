@@ -6,11 +6,11 @@ use num_traits::Float;
 
 use geometry::angle::Angle;
 use linear_algebra::{Framed, IntoFramed};
+use types::step::{Step, StepAndSupportFoot};
 
 use crate::{
     geometry::{pose::PoseAndSupportFoot, Pose},
-    loss_fields::step_size::StepAndSupportFoot,
-    step_plan::{PlannedStep, Step},
+    step_plan::PlannedStep,
 };
 
 pub trait WrapDual<Dual> {
