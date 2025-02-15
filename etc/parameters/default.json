@@ -398,6 +398,7 @@
   },
   "step_planner": {
     "injected_step": null,
+    "planned_steps": 10,
     "max_step_size": {
       "forward": 0.045,
       "left": 0.06,

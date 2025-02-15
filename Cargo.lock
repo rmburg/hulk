@@ -7450,6 +7450,7 @@ dependencies = [
  "repository",
  "serde",
  "serde_json",
+ "step_planning",
  "thiserror",
  "tokio",
  "toml",

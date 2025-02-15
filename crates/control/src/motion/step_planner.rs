@@ -1,8 +1,11 @@
+use std::time::{Duration, SystemTime};
+
 use color_eyre::Result;
-use coordinate_systems::{Ground, UpcomingSupport};
+use nalgebra::DVector;
 use serde::{Deserialize, Serialize};
 
 use context_attribute::context;
+use coordinate_systems::{Ground, UpcomingSupport};
 use framework::{AdditionalOutput, MainOutput};
 use linear_algebra::Isometry2;
 use step_planning::geometry::Pose;
@@ -17,10 +20,14 @@ use walking_engine::mode::Mode;
 #[derive(Deserialize, Serialize)]
 pub struct StepPlanner {
     last_planned_step: Step,
+    last_step_plan: DVector<f32>,
+    last_support_foot: Side,
 }
 
 #[context]
-pub struct CreationContext {}
+pub struct CreationContext {
+    planned_steps: Parameter<usize, "step_planner.planned_steps">,
+}
 
 #[context]
 pub struct CycleContext {
@@ -34,6 +41,7 @@ pub struct CycleContext {
     rotation_exponent: Parameter<f32, "step_planner.rotation_exponent">,
     translation_exponent: Parameter<f32, "step_planner.translation_exponent">,
     initial_side_bonus: Parameter<f32, "step_planner.initial_side_bonus">,
+    planned_steps: Parameter<usize, "step_planner.planned_steps">,
 
     ground_to_upcoming_support:
         CyclerState<Isometry2<Ground, UpcomingSupport>, "ground_to_upcoming_support">,
@@ -41,6 +49,8 @@ pub struct CycleContext {
 
     ground_to_upcoming_support_out:
         AdditionalOutput<Isometry2<Ground, UpcomingSupport>, "ground_to_upcoming_support">,
+    step_plan: AdditionalOutput<Vec<f32>, "step_plan">,
+    step_planning_duration: AdditionalOutput<Duration, "step_planning_duration">,
 }
 
 #[context]
@@ -50,9 +60,11 @@ pub struct MainOutputs {
 }
 
 impl StepPlanner {
-    pub fn new(_context: CreationContext) -> Result<Self> {
+    pub fn new(context: CreationContext) -> Result<Self> {
         Ok(Self {
             last_planned_step: Step::default(),
+            last_step_plan: DVector::zeros(*context.planned_steps * 3),
+            last_support_foot: Side::Left,
         })
     }
 
@@ -78,11 +90,19 @@ impl StepPlanner {
             });
         };
 
+        let earlier = SystemTime::now();
+
         let step = if let Some(injected_step) = context.injected_step {
             *injected_step
         } else {
-            self.plan_step(path, &context, orientation_mode)?
+            self.plan_step(path, &mut context, orientation_mode)?
         };
+
+        let elapsed = SystemTime::now().duration_since(earlier).unwrap();
+
+        context
+            .step_planning_duration
+            .fill_if_subscribed(|| elapsed);
 
         let step = self.clamp_step_size(&context, speed, step);
 
@@ -124,13 +144,26 @@ impl StepPlanner {
     fn plan_step(
         &mut self,
         path: &[PathSegment],
-        context: &CycleContext,
+        context: &mut CycleContext,
         _orientation_mode: &OrientationMode, // TODO use orientation mode
     ) -> Result<Step> {
+        const VARIABLES_PER_STEP: usize = 3;
+        let num_variables = context.planned_steps * VARIABLES_PER_STEP;
+
         let current_support_foot = context
             .walking_engine_mode
             .support_side()
             .unwrap_or(Side::Left);
+
+        let initial_guess = if self.last_support_foot == current_support_foot {
+            self.last_step_plan.clone()
+        } else {
+            let mut initial_guess = DVector::zeros(num_variables);
+            initial_guess.as_mut_slice()[..(num_variables - VARIABLES_PER_STEP)]
+                .copy_from_slice(&self.last_step_plan.as_slice()[VARIABLES_PER_STEP..]);
+
+            initial_guess
+        };
 
         let step_plan = step_planning_solver::plan_steps(
             Path {
@@ -139,9 +172,19 @@ impl StepPlanner {
             },
             upcoming_support_pose_in_ground(context),
             current_support_foot.opposite(),
+            initial_guess,
         )?;
 
-        Ok(step_plan[0].step.step)
+        context
+            .step_plan
+            .fill_if_subscribed(|| step_plan.as_slice().to_vec());
+
+        let step = Step::from_slice(&step_plan.as_slice()[0..VARIABLES_PER_STEP]);
+
+        self.last_step_plan = step_plan;
+        self.last_support_foot = current_support_foot;
+
+        Ok(step)
     }
 }
 

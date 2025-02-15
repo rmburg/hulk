@@ -1,4 +1,4 @@
-use std::f32::consts::FRAC_PI_2;
+use std::{f32::consts::FRAC_PI_2, time::SystemTime};
 
 use color_eyre::Result;
 
@@ -6,6 +6,7 @@ use geometry::{
     angle::Angle, arc::Arc, circle::Circle, direction::Direction, line_segment::LineSegment,
 };
 use linear_algebra::point;
+use nalgebra::DVector;
 use step_planning::geometry::Pose;
 use step_planning_solver::plan_steps;
 use types::{
@@ -38,11 +39,18 @@ fn main() -> Result<()> {
     };
     let initial_support_foot = Side::Left;
 
-    let planned_steps = plan_steps(path, initial_pose, initial_support_foot)?;
+    let earlier = SystemTime::now();
 
-    for planned_step in planned_steps {
-        dbg!(planned_step);
-    }
+    let _raw_step_plan = plan_steps(path, initial_pose, initial_support_foot, DVector::zeros(30))?;
+
+    let elapsed = SystemTime::now().duration_since(earlier).unwrap();
+
+    println!("Took {elapsed:?}");
+    // let step_plan = StepPlan::from(raw_step_plan.as_slice());
+
+    // for planned_step in step_plan.steps() {
+    //     dbg!(planned_step);
+    // }
 
     Ok(())
 }

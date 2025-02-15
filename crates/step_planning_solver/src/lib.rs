@@ -1,37 +1,35 @@
-use std::{array, vec::Vec};
-
 use argmin::{
-    core::{CostFunction, Error as ArgminError, Executor, Gradient, State},
+    core::{CostFunction, Error as ArgminError, Executor, Gradient},
     solver::{linesearch::MoreThuenteLineSearch, quasinewton::LBFGS},
 };
-use color_eyre::{eyre::eyre, Result};
-use nalgebra::{
-    allocator::Allocator, Const, DefaultAllocator, DimName, OMatrix, SVector, ToTypenum,
+use color_eyre::{
+    eyre::{eyre, OptionExt},
+    Result,
 };
+use nalgebra::{DVector, Dyn, U1};
 use num_dual::{Derivative, DualNum, DualNumFloat, DualVec};
 
 use step_planning::{
     geometry::Pose,
     loss_fields::step_size::{WalkVolumeCoefficients, WalkVolumeExtents},
-    step_plan::{PlannedStep, StepPlan, StepPlanning},
+    step_plan::{StepPlan, StepPlanning},
     traits::{LossField, ScaledGradient, UnwrapDual, WrapDual},
 };
 use types::{planned_path::Path, support_foot::Side};
 
-const STEPS_TO_PLAN: usize = 15;
-const VARIABLES_PER_STEP: usize = 3;
-const NUM_VARIABLES: usize = STEPS_TO_PLAN * VARIABLES_PER_STEP;
+fn duals<F: DualNumFloat + DualNum<F>>(reals: &DVector<F>) -> DVector<DualVec<F, F, Dyn>> {
+    let num_variables = reals.nrows();
 
-fn duals<F: DualNumFloat + DualNum<F>, const N: usize>(
-    reals: &[F; N],
-) -> [DualVec<F, F, Const<N>>; N]
-where
-    Const<N>: ToTypenum,
-{
-    array::from_fn(|i| {
+    reals.map_with_location(|row, _, real| {
         DualVec::new(
-            reals[i],
-            Derivative::some(SVector::ith_axis(i).into_inner()),
+            real,
+            Derivative::some(DVector::from_fn(num_variables, |i, _| {
+                if i == row {
+                    F::one()
+                } else {
+                    F::zero()
+                }
+            })),
         )
     })
 }
@@ -42,7 +40,7 @@ struct StepPlanningProblem {
 }
 
 impl CostFunction for StepPlanningProblem {
-    type Param = Vec<f32>;
+    type Param = DVector<f32>;
 
     type Output = f32;
 
@@ -67,35 +65,20 @@ impl CostFunction for StepPlanningProblem {
     }
 }
 
-trait UnwrapGradient<G> {
-    fn unwrap_gradient(self) -> G;
-}
-
-impl<T: DualNum<F>, F, R: DimName, C: DimName> UnwrapGradient<OMatrix<T, R, C>>
-    for Derivative<T, F, R, C>
-where
-    DefaultAllocator: Allocator<T, R, C>,
-{
-    fn unwrap_gradient(self) -> OMatrix<T, R, C> {
-        self.unwrap_generic(R::name(), C::name())
-    }
-}
-
 impl Gradient for StepPlanningProblem {
     type Param = <Self as CostFunction>::Param;
 
     type Gradient = Self::Param;
 
     fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, ArgminError> {
-        let param_array: [f32; NUM_VARIABLES] = param.as_slice().try_into().unwrap();
-
-        let dual_param = duals(&param_array);
+        let num_variables = param.nrows();
+        let dual_param = duals(param);
 
         let step_planning_loss = self.step_planning.loss_field();
 
         let step_plan = StepPlan::from(dual_param.as_slice());
 
-        let gradient: SVector<f32, NUM_VARIABLES> = self
+        let gradient: DVector<f32> = self
             .step_planning
             .planned_steps(
                 self.step_planning
@@ -112,11 +95,11 @@ impl Gradient for StepPlanningProblem {
 
                 planned_step_gradients
                     .scaled_gradient(derivatives)
-                    .unwrap_gradient()
+                    .unwrap_generic(Dyn(num_variables), U1)
             })
             .sum();
 
-        Ok(gradient.as_slice().into())
+        Ok(gradient)
     }
 }
 
@@ -124,7 +107,8 @@ pub fn plan_steps(
     path: Path,
     initial_pose: Pose<f32>,
     initial_support_foot: Side,
-) -> Result<Vec<PlannedStep<f32>>> {
+    initial_parameter_guess: DVector<f32>,
+) -> Result<DVector<f32>> {
     let line_search = MoreThuenteLineSearch::new();
     let solver = LBFGS::new(line_search, 10);
 
@@ -153,23 +137,12 @@ pub fn plan_steps(
     };
 
     let result = Executor::new(problem.clone(), solver)
-        .configure(|state| state.param(vec![0.0; NUM_VARIABLES]))
+        .configure(|state| state.param(initial_parameter_guess))
         .run()
         .map_err(|error| eyre!("Executor failed: {error:?}"))?;
 
-    println!("{result}");
-
-    let best_param = result.state.get_best_param().unwrap();
-
-    let step_plan = StepPlan::from(best_param.as_slice());
-
-    let steps = problem
-        .step_planning
-        .planned_steps(
-            initial_pose.with_support_foot(initial_support_foot),
-            &step_plan,
-        )
-        .collect();
-
-    Ok(steps)
+    result
+        .state
+        .best_param
+        .ok_or_eyre("best_param was none. This should not happen")
 }
