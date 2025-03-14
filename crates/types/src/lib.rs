@@ -44,6 +44,7 @@ pub mod motion_command;
 pub mod motion_selection;
 pub mod motor_commands;
 pub mod multivariate_normal_distribution;
+pub mod non_uniform_grid;
 pub mod obstacle_avoiding_arms;
 pub mod obstacle_filter;
 pub mod obstacles;

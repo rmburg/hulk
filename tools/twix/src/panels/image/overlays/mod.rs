@@ -1,4 +1,5 @@
 mod ball_detection;
+mod ball_search_heatmap;
 mod feet_detection;
 mod field_border;
 mod horizon;
@@ -9,6 +10,7 @@ mod perspective_grid;
 mod pose_detection;
 
 pub use ball_detection::BallDetection;
+pub use ball_search_heatmap::BallSearchHeatmap;
 pub use feet_detection::FeetDetection;
 pub use field_border::FieldBorder;
 pub use horizon::Horizon;

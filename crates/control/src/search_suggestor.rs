@@ -2,18 +2,21 @@ use std::ops::{Index, IndexMut};
 
 use color_eyre::Result;
 use context_attribute::context;
-use coordinate_systems::{Field, Ground};
-use framework::{AdditionalOutput, MainOutput};
+use coordinate_systems::{Field, Ground, Pixel};
+use framework::{AdditionalOutput, MainOutput, PerceptionInput};
 use itertools::Itertools;
 use linear_algebra::{point, Isometry2, Point2};
 use nalgebra::clamp;
 use ndarray::Array2;
+use projection::{camera_matrices::CameraMatrices, camera_matrix::CameraMatrix, Projection};
 use serde::{Deserialize, Serialize};
 use spl_network_messages::{SubState, Team};
 use types::{
     ball_position::{BallPosition, HypotheticalBallPosition},
     field_dimensions::{FieldDimensions, Half, Side},
     filtered_game_controller_state::FilteredGameControllerState,
+    image_segments::ImageSegments,
+    non_uniform_grid::NonUniformGrid,
     parameters::SearchSuggestorParameters,
     primary_state::PrimaryState,
 };
@@ -43,6 +46,17 @@ pub struct CycleContext {
         Input<Option<FilteredGameControllerState>, "filtered_game_controller_state?">,
 
     heatmap: AdditionalOutput<Array2<f32>, "ball_search_heatmap">,
+    image_segments_top: PerceptionInput<ImageSegments, "VisionTop", "image_segments">,
+    camera_matrix_top: PerceptionInput<CameraMatrix, "VisionTop", "camera_matrix">,
+    // image_segments_bottom: PerceptionInput<ImageSegments, "VisionBottom", "image_segments">,
+
+    // historic_camera_matrices: HistoricInput<Option<CameraMatrices>, "camera_matrices?">,
+    camera_matrices: Input<Option<CameraMatrices>, "camera_matrices?">,
+
+    heatmap_grid_in_pixel: AdditionalOutput<
+        Option<NonUniformGrid<Option<Point2<Pixel>>>>,
+        "ball_search_heatmap_grid_in_pixel",
+    >,
 }
 
 #[context]
@@ -66,10 +80,12 @@ impl SearchSuggestor {
             field_dimensions: *context.field_dimensions,
             cells_per_meter: context.search_suggestor_configuration.cells_per_meter,
         };
+
         Ok(Self { heatmap })
     }
 
     pub fn cycle(&mut self, mut context: CycleContext) -> Result<MainOutputs> {
+        self.update_heatmap2(&context);
         self.update_heatmap(&context);
         let suggested_search_position = self
             .heatmap
@@ -79,8 +95,55 @@ impl SearchSuggestor {
             .heatmap
             .fill_if_subscribed(|| self.heatmap.map.clone());
 
+        if let (Some(camera_matrices), Some(ground_to_field)) =
+            (context.camera_matrices, context.ground_to_field)
+        {
+            let grid_in_pixel =
+                self.project_heatmap_grid_to_pixel(&context, &camera_matrices.top, ground_to_field);
+
+            context
+                .heatmap_grid_in_pixel
+                .fill_if_subscribed(|| Some(grid_in_pixel));
+        } else {
+            context.heatmap_grid_in_pixel.fill_if_subscribed(|| None);
+        }
+
         Ok(MainOutputs {
             suggested_search_position: suggested_search_position.into(),
+        })
+    }
+
+    fn project_heatmap_grid_to_pixel(
+        &mut self,
+        context: &CycleContext,
+        camera_matrix: &CameraMatrix,
+        ground_to_field: &Isometry2<Ground, Field>,
+    ) -> NonUniformGrid<Option<Point2<Pixel>>> {
+        let (heatmap_length, heatmap_width) = (
+            (context.field_dimensions.length
+                * context.search_suggestor_configuration.cells_per_meter)
+                .round() as usize,
+            (context.field_dimensions.width
+                * context.search_suggestor_configuration.cells_per_meter)
+                .round() as usize,
+        );
+
+        let half_field_width = context.field_dimensions.width / 2.0;
+        let half_field_length = context.field_dimensions.length / 2.0;
+
+        let grid_in_field = NonUniformGrid::<Point2<Field>>::new_uniform(
+            -half_field_length..half_field_length,
+            -half_field_width..half_field_width,
+            heatmap_length,
+            heatmap_width,
+        );
+
+        let field_to_ground = ground_to_field.inverse();
+
+        grid_in_field.map(|point| {
+            let point_in_ground = field_to_ground * point;
+
+            camera_matrix.ground_to_pixel(point_in_ground).ok()
         })
     }
 
@@ -109,7 +172,50 @@ impl SearchSuggestor {
 
         self.heatmap.map *= 1.0 - context.search_suggestor_configuration.heatmap_decay_factor;
     }
+
+    fn update_heatmap2(&mut self, context: &CycleContext) {
+        let Some((camera_matrix_time, camera_matrix_buffer)) =
+            context.camera_matrix_top.persistent.last_key_value()
+        else {
+            return;
+        };
+        let Some((image_segments_time, image_segments_buffer)) =
+            context.image_segments_top.persistent.last_key_value()
+        else {
+            return;
+        };
+    }
 }
+
+// // TODO deduplicate with twix
+// struct SegmentInGround {
+//     start: Point2<Ground>,
+//     end: Point2<Ground>,
+//     line_width: f32,
+// }
+
+// // TODO deduplicate with twix
+// fn project_segment_to_ground(
+//     x: f32,
+//     segment: &types::image_segments::Segment,
+//     camera_matrix: &CameraMatrix,
+// ) -> Result<SegmentInGround> {
+//     let start = point![x, segment.start as f32];
+//     let end = point![x, segment.end as f32];
+
+//     let start_in_ground = camera_matrix.pixel_to_ground(start)?;
+//     let end_in_ground = camera_matrix.pixel_to_ground(end)?;
+
+//     let midpoint = center(start, end);
+//     let pixel_radius = 100.0 * camera_matrix.get_pixel_radius(0.01, midpoint)?;
+//     let line_width = 3.0 / pixel_radius;
+
+//     Ok(SegmentInGround {
+//         start: start_in_ground,
+//         end: end_in_ground,
+//         line_width,
+//     })
+// }
 
 #[derive(Deserialize, Serialize)]
 struct Heatmap {
