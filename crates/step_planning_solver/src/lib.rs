@@ -1,5 +1,5 @@
 use argmin::{
-    core::{CostFunction, Error as ArgminError, Executor, Gradient},
+    core::{CostFunction, Error as ArgminError, Executor, Gradient, State},
     solver::{linesearch::MoreThuenteLineSearch, quasinewton::LBFGS},
 };
 use color_eyre::{
@@ -137,9 +137,11 @@ pub fn plan_steps(
     };
 
     let result = Executor::new(problem.clone(), solver)
-        .configure(|state| state.param(initial_parameter_guess))
+        .configure(|state| state.param(initial_parameter_guess).max_iters(1000))
         .run()
         .map_err(|error| eyre!("Executor failed: {error:?}"))?;
+
+    dbg!(&result.state);
 
     result
         .state

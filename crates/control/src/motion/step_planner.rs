@@ -16,6 +16,8 @@ use types::{
 };
 use walking_engine::mode::Mode;
 
+const VARIABLES_PER_STEP: usize = 3;
+
 #[derive(Deserialize, Serialize)]
 pub struct StepPlanner {
     last_planned_step: Step,
@@ -65,7 +67,7 @@ impl StepPlanner {
     pub fn new(context: CreationContext) -> Result<Self> {
         Ok(Self {
             last_planned_step: Step::default(),
-            last_step_plan: DVector::zeros(*context.planned_steps * 3),
+            last_step_plan: DVector::zeros(*context.planned_steps * VARIABLES_PER_STEP),
             last_support_foot: Side::Left,
         })
     }
@@ -175,7 +177,6 @@ impl StepPlanner {
         context: &mut CycleContext,
         _orientation_mode: &OrientationMode, // TODO use orientation mode
     ) -> Result<Step> {
-        const VARIABLES_PER_STEP: usize = 3;
         let num_variables = context.planned_steps * VARIABLES_PER_STEP;
 
         let current_support_foot = context
@@ -183,15 +184,9 @@ impl StepPlanner {
             .support_side()
             .unwrap_or(Side::Left);
 
-        let initial_guess = if self.last_support_foot == current_support_foot {
-            self.last_step_plan.clone()
-        } else {
-            let mut initial_guess = DVector::zeros(num_variables);
-            initial_guess.as_mut_slice()[..(num_variables - VARIABLES_PER_STEP)]
-                .copy_from_slice(&self.last_step_plan.as_slice()[VARIABLES_PER_STEP..]);
-
-            initial_guess
-        };
+        let initial_guess = DVector::zeros(num_variables);
+        dbg!(&initial_guess);
+        dbg!(&num_variables);
 
         let step_plan = step_planning_solver::plan_steps(
             Path {
