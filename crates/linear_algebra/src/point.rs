@@ -1,4 +1,4 @@
-use nalgebra::{ClosedAddAssign, ClosedMulAssign, ClosedSubAssign, Scalar, SimdComplexField};
+use nalgebra::{ClosedAdd, ClosedMul, ClosedSub, Scalar, SimdComplexField};
 use num_traits::{One, Zero};
 use simba::scalar::SupersetOf;
 
@@ -81,7 +81,7 @@ impl<Frame, const DIMENSION: usize, T: Scalar> Point<Frame, DIMENSION, T> {
 
     pub fn lerp(&self, other: Self, t: T) -> Self
     where
-        T: Zero + One + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign,
+        T: Zero + One + ClosedAdd + ClosedSub + ClosedMul,
     {
         Self::wrap(self.inner.lerp(&other.inner, t))
     }
