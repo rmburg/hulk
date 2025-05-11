@@ -86,7 +86,7 @@ impl StepPlanning {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PlannedStep<T: Scalar> {
     /// Pose reached after this step
     pub pose: Pose<T>,

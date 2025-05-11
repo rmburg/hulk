@@ -79,8 +79,6 @@ aliveness = { path = "crates/aliveness" }
 alsa = "0.9.1"
 approx = "0.5.1"
 approx_derive = { path = "crates/approx_derive" }
-argmin = "0.10.0"
-argmin-math = { version = "0.4.0", features = ["nalgebra_latest"] }
 argument_parsers = { path = "crates/argument_parsers" }
 audio = { path = "crates/audio" }
 awaitgroup = "0.7.0"
@@ -164,6 +162,7 @@ nao_camera = { path = "crates/nao_camera" }
 ndarray = { version = "0.16.1", features = ["serde"] }
 ndarray-conv = "0.4.1"
 nix = { version = "0.29", features = ["ioctl"] }
+nlopt = "0.8.1"
 nucleo-matcher = "0.3.1"
 num-derive = "0.4.2"
 num-dual = "0.9.0"

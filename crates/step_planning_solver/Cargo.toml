@@ -6,12 +6,11 @@ license.workspace = true
 homepage.workspace = true
 
 [dependencies]
-argmin.workspace = true
-argmin-math.workspace = true
 color-eyre.workspace = true
 geometry.workspace = true
+linear_algebra.workspace = true
 nalgebra.workspace = true
+nlopt.workspace = true
 num-dual.workspace = true
 step_planning.workspace = true
 types.workspace = true
-linear_algebra.workspace = true

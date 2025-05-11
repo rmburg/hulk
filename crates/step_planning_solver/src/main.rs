@@ -6,7 +6,6 @@ use geometry::{
     angle::Angle, arc::Arc, circle::Circle, direction::Direction, line_segment::LineSegment,
 };
 use linear_algebra::point;
-use nalgebra::DVector;
 use step_planning::geometry::Pose;
 use step_planning_solver::plan_steps;
 use types::{
@@ -41,7 +40,14 @@ fn main() -> Result<()> {
 
     let earlier = SystemTime::now();
 
-    let _raw_step_plan = plan_steps(path, initial_pose, initial_support_foot, DVector::zeros(30))?;
+    let mut initial_parameter_guess = vec![0.0; 30];
+    let _raw_step_plan = plan_steps(
+        path,
+        initial_pose,
+        initial_support_foot,
+        &mut initial_parameter_guess,
+    )
+    .unwrap();
 
     let elapsed = SystemTime::now().duration_since(earlier).unwrap();
 

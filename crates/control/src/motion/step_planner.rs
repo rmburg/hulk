@@ -5,7 +5,6 @@ use context_attribute::context;
 use coordinate_systems::{Ground, UpcomingSupport};
 use framework::{AdditionalOutput, MainOutput};
 use linear_algebra::Isometry2;
-use nalgebra::DVector;
 use serde::{Deserialize, Serialize};
 use step_planning::geometry::Pose;
 use types::{
@@ -21,7 +20,7 @@ const VARIABLES_PER_STEP: usize = 3;
 #[derive(Deserialize, Serialize)]
 pub struct StepPlanner {
     last_planned_step: Step,
-    last_step_plan: DVector<f32>,
+    last_step_plan: Vec<f64>,
     last_support_foot: Side,
 }
 
@@ -53,7 +52,7 @@ pub struct CycleContext {
     ground_to_upcoming_support_out:
         AdditionalOutput<Isometry2<Ground, UpcomingSupport>, "ground_to_upcoming_support">,
     max_step_size_output: AdditionalOutput<Step, "max_step_size">,
-    step_plan: AdditionalOutput<Vec<f32>, "step_plan">,
+    step_plan: AdditionalOutput<Vec<f64>, "step_plan">,
     step_planning_duration: AdditionalOutput<Duration, "step_planning_duration">,
 }
 
@@ -67,7 +66,7 @@ impl StepPlanner {
     pub fn new(context: CreationContext) -> Result<Self> {
         Ok(Self {
             last_planned_step: Step::default(),
-            last_step_plan: DVector::zeros(*context.planned_steps * VARIABLES_PER_STEP),
+            last_step_plan: vec![0.0; *context.planned_steps * VARIABLES_PER_STEP],
             last_support_foot: Side::Left,
         })
     }
@@ -184,28 +183,33 @@ impl StepPlanner {
             .support_side()
             .unwrap_or(Side::Left);
 
-        let initial_guess = DVector::zeros(num_variables);
+        let mut variables = vec![0.0; num_variables];
 
-        let step_plan = step_planning_solver::plan_steps(
+        match step_planning_solver::plan_steps(
             Path {
                 // TODO skip this allocation
                 segments: path.to_vec(),
             },
             upcoming_support_pose_in_ground(context),
             current_support_foot.opposite(),
-            initial_guess,
-        )?;
+            &mut variables,
+        ) {
+            Ok((state, _)) => println!("optimizer finished with {state:?}"),
+            Err((state, _)) => println!("optimizer failed with {state:?}"),
+        }
 
-        context
-            .step_plan
-            .fill_if_subscribed(|| step_plan.as_slice().to_vec());
+        context.step_plan.fill_if_subscribed(|| variables.to_vec());
 
-        let step = Step::from_slice(&step_plan.as_slice()[0..VARIABLES_PER_STEP]);
+        let step = Step::from_slice(&variables.as_slice()[0..VARIABLES_PER_STEP]);
 
-        self.last_step_plan = step_plan;
+        self.last_step_plan = variables;
         self.last_support_foot = current_support_foot;
 
-        Ok(step)
+        Ok(Step {
+            forward: step.forward as f32,
+            left: step.left as f32,
+            turn: step.turn as f32,
+        })
     }
 }
 
