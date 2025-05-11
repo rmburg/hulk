@@ -185,8 +185,6 @@ impl StepPlanner {
             .unwrap_or(Side::Left);
 
         let initial_guess = DVector::zeros(num_variables);
-        dbg!(&initial_guess);
-        dbg!(&num_variables);
 
         let step_plan = step_planning_solver::plan_steps(
             Path {

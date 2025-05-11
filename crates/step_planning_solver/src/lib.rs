@@ -1,5 +1,8 @@
 use argmin::{
-    core::{CostFunction, Error as ArgminError, Executor, Gradient, State},
+    core::{
+        CostFunction, Error as ArgminError, Executor, Gradient, TerminationReason::SolverExit,
+        TerminationStatus,
+    },
     solver::{linesearch::MoreThuenteLineSearch, quasinewton::LBFGS},
 };
 use color_eyre::{
@@ -114,7 +117,7 @@ pub fn plan_steps(
 
     let problem = StepPlanningProblem {
         step_planning: StepPlanning {
-            path,
+            path: path.clone(),
             initial_pose: initial_pose.clone(),
             initial_support_foot,
             path_progress_reward: 5.0,
@@ -141,7 +144,10 @@ pub fn plan_steps(
         .run()
         .map_err(|error| eyre!("Executor failed: {error:?}"))?;
 
-    dbg!(&result.state);
+    if let TerminationStatus::Terminated(SolverExit(reason)) = result.state.termination_status {
+        println!("executor failed: {reason:?}");
+        dbg!(path.segments, initial_pose, initial_support_foot);
+    };
 
     result
         .state
