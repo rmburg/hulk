@@ -1,7 +1,13 @@
+use std::marker::PhantomData;
+
 use cdr::{CdrLe, Infinite};
 use serde::Serialize;
-use std::marker::PhantomData;
 use zenoh::pubsub::Publisher as ZenohPublisher;
+
+use crate::{
+    typestate::{Nothing, Settable, Something},
+    Session,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PublisherError {
@@ -32,6 +38,13 @@ where
         }
     }
 
+    pub fn builder() -> PublisherBuilder<T> {
+        PublisherBuilder {
+            key: Nothing,
+            _phantom: PhantomData,
+        }
+    }
+
     pub async fn is_subscribed(&self) -> Result<bool> {
         let status = self
             .publisher
@@ -56,5 +69,49 @@ where
             self.put(&value).await?;
         }
         Ok(())
+    }
+}
+
+pub struct PublisherBuilder<T, KeyState: Settable<String> = Nothing> {
+    key: KeyState,
+    _phantom: PhantomData<T>,
+}
+
+impl<T> PublisherBuilder<T, Nothing>
+where
+    T: Serialize,
+{
+    pub fn new() -> Self {
+        Self {
+            key: Nothing,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn key(self, key: impl Into<String>) -> PublisherBuilder<T, Something<String>> {
+        PublisherBuilder {
+            key: Something { inner: key.into() },
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> Default for PublisherBuilder<T, Nothing>
+where
+    T: Serialize,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Serialize> PublisherBuilder<T, Something<String>> {
+    pub async fn build(self, session: &Session) -> Result<Publisher<'_, T>> {
+        let publisher = session.session.declare_publisher(self.key.inner).await?;
+
+        Ok(Publisher {
+            publisher,
+            _phantom: PhantomData,
+        })
     }
 }

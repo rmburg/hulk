@@ -11,6 +11,7 @@ pub mod cache;
 pub mod publisher;
 pub mod session;
 pub mod stream;
+pub mod typestate;
 
 pub trait Timestamped {
     fn timestamp(&self) -> Duration;

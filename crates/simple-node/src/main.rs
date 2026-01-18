@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use booster::{ImuState, LowState};
 use color_eyre::{eyre::Context as _, Result};
-use hulkz::Session;
+use hulkz::{Publisher, Session};
 use linear_algebra::vector;
 use tokio::time::sleep;
 use tracing::info;
@@ -20,8 +20,9 @@ async fn main() -> Result<()> {
 
     let session = Session::new().await?;
 
-    let publisher = session
-        .publish("booster/low_state")
+    let publisher = Publisher::builder()
+        .key("booster/low_state")
+        .build(&session)
         .await
         .wrap_err("failed to create publisher")?;
 

@@ -14,7 +14,7 @@ pub enum SessionError {
 pub type Result<T, E = SessionError> = std::result::Result<T, E>;
 
 pub struct Session {
-    session: Arc<zenoh::Session>,
+    pub(crate) session: Arc<zenoh::Session>,
 }
 
 impl Session {
