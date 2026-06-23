@@ -2147,11 +2147,11 @@ dependencies = [
 
 [[package]]
 name = "booster_sdk"
-version = "0.1.1-alpha.1"
-source = "git+https://github.com/IntelligentRoboticsLab/booster_sdk?rev=638c1973c0a1a729b47b1133af5b4af16a41b9bd#638c1973c0a1a729b47b1133af5b4af16a41b9bd"
+version = "0.1.1-alpha.2"
+source = "git+https://github.com/IntelligentRoboticsLab/booster_sdk?rev=12c0e316e1ce9311e66a82dc99797c41967e4732#12c0e316e1ce9311e66a82dc99797c41967e4732"
 dependencies = [
  "futures",
- "rustdds 0.11.9",
+ "rustdds",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -9512,7 +9512,7 @@ dependencies = [
  "mio-extras",
  "nom 8.0.0",
  "pin-utils",
- "rustdds 0.11.8",
+ "rustdds",
  "serde",
  "serde_repr",
  "tracing",
@@ -9599,44 +9599,8 @@ dependencies = [
 
 [[package]]
 name = "rustdds"
-version = "0.11.8"
-source = "git+https://github.com/HULKs/RustDDS.git?rev=0232af0c67e25e39afb5eef0166edfe493762320#0232af0c67e25e39afb5eef0166edfe493762320"
-dependencies = [
- "bit-vec 0.8.0",
- "byteorder",
- "bytes",
- "cdr-encoding",
- "cdr-encoding-size",
- "chrono",
- "enumflags2",
- "futures",
- "if-addrs",
- "io-extras",
- "local-ip-address",
- "log",
- "md5",
- "mio 0.6.23",
- "mio 0.8.11",
- "mio-extras",
- "num-derive",
- "num-traits",
- "paste",
- "pnet",
- "pnet_sys",
- "rand 0.9.4",
- "serde",
- "serde_repr",
- "socket2 0.6.4",
- "socketpair",
- "speedy",
- "static_assertions",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "rustdds"
 version = "0.11.9"
-source = "git+https://github.com/oxkitsune/RustDDS.git?branch=gijs%2Flocalhost-only#84a9e15d02793794bebdf9e67f604931c950281c"
+source = "git+https://github.com/HULKs/RustDDS.git?rev=436bcd0787bc62b06855d3c4cab6ae1911d88a09#436bcd0787bc62b06855d3c4cab6ae1911d88a09"
 dependencies = [
  "bit-vec 0.8.0",
  "byteorder",
