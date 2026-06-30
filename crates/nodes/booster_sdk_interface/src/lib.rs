@@ -399,6 +399,7 @@ fn sdk_mode_for(desired_mode: control::DesiredMode) -> booster_sdk::types::Robot
     match desired_mode {
         control::DesiredMode::Damping => booster_sdk::types::RobotMode::Damping,
         control::DesiredMode::Prepare => booster_sdk::types::RobotMode::Prepare,
+        control::DesiredMode::Soccer => booster_sdk::types::RobotMode::Soccer,
         control::DesiredMode::Walking => booster_sdk::types::RobotMode::Walking,
     }
 }

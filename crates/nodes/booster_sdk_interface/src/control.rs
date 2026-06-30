@@ -18,6 +18,7 @@ use crate::WalkingParameters;
 pub enum DesiredMode {
     Damping,
     Prepare,
+    Soccer,
     Walking,
 }
 
@@ -25,8 +26,8 @@ pub fn desired_mode_for(command: &MotionCommand) -> DesiredMode {
     match command {
         MotionCommand::Damping => DesiredMode::Damping,
         MotionCommand::Prepare | MotionCommand::StandUp => DesiredMode::Prepare,
+        MotionCommand::VisualKick { .. } => DesiredMode::Soccer,
         MotionCommand::Stand { .. }
-        | MotionCommand::VisualKick { .. }
         | MotionCommand::Walk { .. }
         | MotionCommand::WalkWithVelocity { .. } => DesiredMode::Walking,
     }
