@@ -53,6 +53,7 @@ members = [
   "crates/nodes/message_filter",
   "crates/nodes/message_handler",
   "crates/nodes/microphone_recorder",
+  "crates/nodes/motion",
   "crates/nodes/motor_commands_collector",
   "crates/nodes/obstacle_filter",
   "crates/nodes/odometer_bridge",
@@ -156,7 +157,9 @@ egui = { version = "0.36.1", features = ["persistence"] }
 egui_bevy = { path = "crates/egui_bevy" }
 egui_dock = { version = "0.21.1", features = ["serde"] }
 egui_extras = { version = "0.36.1", features = ["image"] }
-egui_material_icons = { version = "0.8.0", default-features = false, features = ["outline"] }
+egui_material_icons = { version = "0.8.0", default-features = false, features = [
+  "outline",
+] }
 egui_plot = "0.37.0"
 egui_tiles = "0.17.1"
 energy_optimization = { path = "crates/energy_optimization" }
