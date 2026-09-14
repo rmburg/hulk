@@ -154,7 +154,7 @@ pub enum HeadMotion {
     LookLeftAndRightOf {
         target: Point2<Ground>,
     },
-    Unstiff,
+    Damping,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, Message)]
