@@ -25,7 +25,6 @@ pub mod game_controller_state;
 pub mod grayscale_image;
 pub mod heatmap;
 pub mod image_segments;
-pub mod initial_look_around;
 pub mod initial_pose;
 pub mod joint_limits;
 pub mod jpeg;
