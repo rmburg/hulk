@@ -5282,6 +5282,7 @@ dependencies = [
  "ros-z-schema",
  "rsruckig",
  "serde",
+ "tokio",
  "tracing",
  "types",
 ]
