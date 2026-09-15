@@ -8890,6 +8890,7 @@ version = "0.1.0"
 dependencies = [
  "approx",
  "coordinate_systems",
+ "kinematics",
  "linear_algebra",
  "nalgebra 0.34.2",
  "ros-z",
