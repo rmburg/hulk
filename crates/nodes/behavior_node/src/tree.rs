@@ -7,8 +7,8 @@ use crate::{
     condition,
     conditions::{
         has_ball_position, is_ball_interception_candidate, is_close_to_ball, is_closest_to_ball,
-        is_fallen, is_goalkeeper, is_last_hulk_standing, is_primary_state, is_remote_controlled,
-        is_remote_kick_mode, is_simple,
+        is_fallen, is_falling, is_goalkeeper, is_last_hulk_standing, is_primary_state,
+        is_remote_controlled, is_remote_kick_mode, is_simple,
     },
     goalkeeper::goalkeeper_subtree,
     head::{look_around, look_at_ball_subtree, look_straight_ahead, search_for_lost_ball_subtree},
@@ -64,6 +64,7 @@ pub fn create_tree() -> Node<Blackboard> {
             action!(look_around),
             action!(stand)
         ),
+        sequence!(condition!(is_falling), action!(damping)),
         sequence!(condition!(is_fallen), action!(stand_up)),
         sequence!(
             condition!(is_primary_state, PrimaryState::Set),
