@@ -1,5 +1,5 @@
 use crate::config::{Parameters, Policy};
-use anyhow::{Context, Result, ensure};
+use color_eyre::eyre::{Result, WrapErr, ensure, eyre};
 use ort::{
     session::Session,
     value::{Tensor, TensorElementType, ValueType},
@@ -16,7 +16,7 @@ impl Network {
         let configured = parameters
             .policies
             .get(&policy)
-            .with_context(|| format!("missing parameters for {policy:?}"))?;
+            .ok_or_else(|| eyre!("missing parameters for {policy:?}"))?;
         ensure!(
             parameters.inference_threads > 0,
             "inference_threads must be positive"
@@ -28,7 +28,7 @@ impl Network {
             .with_inter_threads(parameters.inference_threads)
             .map_err(ort::Error::<()>::from)?
             .commit_from_file(&path)
-            .with_context(|| format!("loading {}", path.display()))?;
+            .wrap_err_with(|| format!("loading {}", path.display()))?;
         ensure!(
             session.inputs().len() == 1 && session.outputs().len() == 1,
             "{policy:?}: expected one input and output"
