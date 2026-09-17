@@ -5188,6 +5188,7 @@ dependencies = [
  "color-eyre",
  "kinematics",
  "linear_algebra",
+ "motion",
  "ros-z",
  "ros2",
  "serde",
