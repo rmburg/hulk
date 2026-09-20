@@ -1,8 +1,8 @@
 {
   joint_control: {
     // Active position/velocity feedback gains, local to head motion.
-    kp: { yaw: 10.0, pitch: 10.0 },
-    kd: { yaw: 1.2, pitch: 1.2 },
+    kp: { yaw: 12.0, pitch: 10.0 },
+    kd: { yaw: 1.0, pitch: 1.2 },
     // rad/s. The velocity ceiling is 2*pi for each joint.
     maximum_velocity: { yaw: 6.283185307, pitch: 6.283185307 },
     // Provisional tuning values: validate acceleration, jerk and damping on K1.
