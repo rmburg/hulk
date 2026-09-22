@@ -1,6 +1,7 @@
 use super::*;
 use crate::inputs::{Latest, Sample};
 use booster::{JointsMotorState, LowState};
+use color_eyre::Report;
 use ros_z::{
     prelude::*,
     qos::{QosHistory, QosReliability},
@@ -127,34 +128,53 @@ pub(super) async fn run(ctx: Arc<Context>) -> Result<()> {
             inner: UpperBodyJoints::fill(0.0),
         },
     };
-    let mut safety = ControlSafety::default();
+
+    let motion_emergency_stop_pub = node
+        .publisher::<()>("motion/emergency_stop")
+        .build()
+        .await
+        .wrap_err("failed to build emergency stop publisher")?;
+
+    let mut safety = ControlSafety::new(motion_emergency_stop_pub);
     let mut timer = node.create_timer(Duration::from_millis(20));
     loop {
         timer.tick().await;
         let p = parameters.snapshot();
-        let command = cycle(&node, &inputs, &mut motion, &mut safety, p.typed()).await;
+        let command = cycle(&node, &inputs, &mut motion, &mut safety, p.typed()).await?;
         outputs.publish(&command).await?;
     }
 }
 
-#[derive(Default)]
 struct ControlSafety {
     fault: Option<String>,
     saw_damping: bool,
     has_actuated: bool,
     last_input_warning: Option<Instant>,
+    emergency_stop_pub: Publisher<()>,
 }
 impl ControlSafety {
-    fn fail(&mut self, error: impl std::fmt::Display) {
+    pub fn new(emergency_stop_pub: Publisher<()>) -> Self {
+        Self {
+            fault: None,
+            saw_damping: false,
+            has_actuated: false,
+            last_input_warning: None,
+            emergency_stop_pub,
+        }
+    }
+
+    async fn fail(&mut self, error: impl std::fmt::Display) -> Result<()> {
         if self.fault.is_none() {
             error!("motion safety fault: {error:#}");
             self.fault = Some(format!("{error:#}"));
             self.saw_damping = false;
+            self.emergency_stop_pub.publish(&()).await?;
         }
+        Ok(())
     }
-    fn reject_input(&mut self, error: color_eyre::Report) {
+    async fn reject_input(&mut self, error: Report) -> Result<()> {
         if self.has_actuated {
-            self.fail(error);
+            self.fail(error).await?;
         } else if self
             .last_input_warning
             .is_none_or(|time| time.elapsed() >= Duration::from_secs(1))
@@ -162,6 +182,8 @@ impl ControlSafety {
             warn!("motion input rejected before actuation; commanding Damping: {error:#}");
             self.last_input_warning = Some(Instant::now());
         }
+
+        Ok(())
     }
     fn rearm(&mut self, command: &MotionCommand) -> bool {
         match command {
@@ -186,7 +208,7 @@ async fn cycle(
     motion: &mut MotionState,
     safety: &mut ControlSafety,
     p: &Parameters,
-) -> RobotCommand {
+) -> Result<RobotCommand> {
     let request = inputs.commands.fresh(node.clock(), p.maximum_command_age);
     if let Ok(request) = &request
         && matches!(request.received.message, MotionCommand::Damping)
@@ -194,34 +216,34 @@ async fn cycle(
         if safety.has_actuated
             && let Err(error) = inputs.frame(node.clock(), p)
         {
-            safety.fail(error);
+            safety.fail(error).await?;
         }
         if safety.fault.is_some() {
             safety.rearm(&request.received);
         }
         motion.deactivate();
-        return RobotCommand::Damping;
+        return Ok(RobotCommand::Damping);
     }
     let frame = match inputs.frame(node.clock(), p) {
         Ok(frame) => frame,
         Err(error) => {
-            safety.reject_input(error);
+            safety.reject_input(error).await?;
             motion.deactivate();
-            return RobotCommand::Damping;
+            return Ok(RobotCommand::Damping);
         }
     };
     if safety.fault.is_some() && !safety.rearm(&frame.command.received) {
         motion.deactivate();
-        return RobotCommand::Damping;
+        return Ok(RobotCommand::Damping);
     }
     if matches!(frame.command.received.message, MotionCommand::Prepare) {
         motion.deactivate();
-        return RobotCommand::Prepare;
+        return Ok(RobotCommand::Prepare);
     }
     if let Some(fault) = &frame.hardware.received.fault {
-        safety.fail(fault);
+        safety.fail(fault).await?;
         motion.deactivate();
-        return RobotCommand::Damping;
+        return Ok(RobotCommand::Damping);
     }
     let initialized = inputs
         .inference
@@ -229,17 +251,17 @@ async fn cycle(
         .is_some_and(|s| !matches!(s.received.state, motion_inference::node::State::Idle));
     if !initialized {
         motion.deactivate();
-        return RobotCommand::Damping;
+        return Ok(RobotCommand::Damping);
     }
     if frame.hardware.received.acknowledged != Some(ControlMode::Custom)
         || frame.hardware.received.desired != ControlMode::Custom
     {
         if motion.active {
-            safety.fail("lost Custom mode acknowledgement");
+            safety.fail("lost Custom mode acknowledgement").await?;
             motion.deactivate();
-            return RobotCommand::Damping;
+            return Ok(RobotCommand::Damping);
         }
-        return RobotCommand::EnableCustom;
+        return Ok(RobotCommand::EnableCustom);
     }
     if !motion.active {
         motion.last_arms = TimeWrapper {
@@ -250,12 +272,12 @@ async fn cycle(
     match infer_and_validate(node, inputs, motion, &frame, p).await {
         Ok(command) => {
             safety.has_actuated |= matches!(command, RobotCommand::Custom { .. });
-            command
+            Ok(command)
         }
         Err(error) => {
-            safety.fail(error);
+            safety.fail(error).await?;
             motion.deactivate();
-            RobotCommand::Damping
+            Ok(RobotCommand::Damping)
         }
     }
 }
