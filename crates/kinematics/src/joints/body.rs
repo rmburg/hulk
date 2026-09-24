@@ -2,18 +2,7 @@ use std::ops::{Add, Div, Mul, Sub};
 
 use serde::{Deserialize, Serialize};
 
-use super::{
-    Joints,
-    arm::{ArmJoint, ArmJoints},
-    leg::{LegJoint, LegJoints},
-};
-
-pub enum BodyJointsName {
-    LeftArm(ArmJoint),
-    RightArm(ArmJoint),
-    LeftLeg(LegJoint),
-    RightLeg(LegJoint),
-}
+use super::{Joints, arm::ArmJoints, leg::LegJoints};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
 pub struct BodyJoints<T = f32> {

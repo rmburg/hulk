@@ -1,21 +1,11 @@
 use std::{
-    ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Neg, Sub},
+    ops::{Add, AddAssign, Div, Mul, Neg, Sub},
     time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
 
 use super::mirror::Mirror;
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
-pub enum LegJoint {
-    HipPitch,
-    HipRoll,
-    HipYaw,
-    Knee,
-    AnkleUp,
-    AnkleDown,
-}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
 pub struct LegJoints<T = f32> {
@@ -193,34 +183,6 @@ impl Mirror for LegJoints<f32> {
             knee: self.knee,
             ankle_up: self.ankle_up,
             ankle_down: -self.ankle_down,
-        }
-    }
-}
-
-impl<T> Index<LegJoint> for LegJoints<T> {
-    type Output = T;
-
-    fn index(&self, index: LegJoint) -> &Self::Output {
-        match index {
-            LegJoint::HipPitch => &self.hip_pitch,
-            LegJoint::HipRoll => &self.hip_roll,
-            LegJoint::HipYaw => &self.hip_yaw,
-            LegJoint::Knee => &self.knee,
-            LegJoint::AnkleUp => &self.ankle_up,
-            LegJoint::AnkleDown => &self.ankle_down,
-        }
-    }
-}
-
-impl<T> IndexMut<LegJoint> for LegJoints<T> {
-    fn index_mut(&mut self, index: LegJoint) -> &mut Self::Output {
-        match index {
-            LegJoint::HipPitch => &mut self.hip_pitch,
-            LegJoint::HipRoll => &mut self.hip_roll,
-            LegJoint::HipYaw => &mut self.hip_yaw,
-            LegJoint::Knee => &mut self.knee,
-            LegJoint::AnkleUp => &mut self.ankle_up,
-            LegJoint::AnkleDown => &mut self.ankle_down,
         }
     }
 }

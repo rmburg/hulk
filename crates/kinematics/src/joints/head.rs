@@ -1,17 +1,11 @@
 use std::{
-    ops::{Add, Div, Index, IndexMut, Mul, Sub},
+    ops::{Add, Div, Mul, Sub},
     time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
 
 use super::mirror::Mirror;
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
-pub enum HeadJoint {
-    Yaw,
-    Pitch,
-}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
 pub struct HeadJoints<T> {
@@ -107,26 +101,6 @@ impl Mirror for HeadJoints<f32> {
         Self {
             yaw: -self.yaw,
             pitch: self.pitch,
-        }
-    }
-}
-
-impl<T> Index<HeadJoint> for HeadJoints<T> {
-    type Output = T;
-
-    fn index(&self, index: HeadJoint) -> &Self::Output {
-        match index {
-            HeadJoint::Yaw => &self.yaw,
-            HeadJoint::Pitch => &self.pitch,
-        }
-    }
-}
-
-impl<T> IndexMut<HeadJoint> for HeadJoints<T> {
-    fn index_mut(&mut self, index: HeadJoint) -> &mut Self::Output {
-        match index {
-            HeadJoint::Yaw => &mut self.yaw,
-            HeadJoint::Pitch => &mut self.pitch,
         }
     }
 }

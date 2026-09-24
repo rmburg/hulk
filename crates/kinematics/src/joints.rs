@@ -8,29 +8,14 @@ use std::{
     array::IntoIter,
     f32::consts::PI,
     iter::{Chain, Sum},
-    ops::{Add, Div, Index, IndexMut, Mul, Sub},
+    ops::{Add, Div, Mul, Sub},
 };
 
 use mirror::SwapSides;
 use serde::{Deserialize, Serialize};
 use splines::impl_Interpolate;
 
-use self::{
-    arm::{ArmJoint, ArmJoints},
-    body::BodyJoints,
-    head::{HeadJoint, HeadJoints},
-    leg::{LegJoint, LegJoints},
-    mirror::Mirror,
-};
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
-pub enum JointsName {
-    Head(HeadJoint),
-    LeftArm(ArmJoint),
-    RightArm(ArmJoint),
-    LeftLeg(LegJoint),
-    RightLeg(LegJoint),
-}
+use self::{arm::ArmJoints, body::BodyJoints, head::HeadJoints, leg::LegJoints, mirror::Mirror};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ros_z::Message)]
 pub struct Joints<T = f32> {
@@ -52,121 +37,12 @@ impl<T> Joints<T> {
         }
     }
 
-    pub fn enumerate(self) -> <Joints<(JointsName, T)> as IntoIterator>::IntoIter {
-        Joints {
-            head: HeadJoints {
-                yaw: (JointsName::Head(HeadJoint::Yaw), self.head.yaw),
-                pitch: (JointsName::Head(HeadJoint::Pitch), self.head.pitch),
-            },
-            left_arm: ArmJoints {
-                shoulder_pitch: (
-                    JointsName::LeftArm(ArmJoint::ShoulderPitch),
-                    self.left_arm.shoulder_pitch,
-                ),
-                shoulder_roll: (
-                    JointsName::LeftArm(ArmJoint::ShoulderRoll),
-                    self.left_arm.shoulder_roll,
-                ),
-                shoulder_yaw: (
-                    JointsName::LeftArm(ArmJoint::ShoulderYaw),
-                    self.left_arm.shoulder_yaw,
-                ),
-                elbow: (JointsName::LeftArm(ArmJoint::Elbow), self.left_arm.elbow),
-            },
-            right_arm: ArmJoints {
-                shoulder_pitch: (
-                    JointsName::RightArm(ArmJoint::ShoulderPitch),
-                    self.right_arm.shoulder_pitch,
-                ),
-                shoulder_roll: (
-                    JointsName::RightArm(ArmJoint::ShoulderRoll),
-                    self.right_arm.shoulder_roll,
-                ),
-                shoulder_yaw: (
-                    JointsName::RightArm(ArmJoint::ShoulderYaw),
-                    self.right_arm.shoulder_yaw,
-                ),
-                elbow: (JointsName::RightArm(ArmJoint::Elbow), self.right_arm.elbow),
-            },
-            left_leg: LegJoints {
-                ankle_down: (
-                    JointsName::LeftLeg(LegJoint::AnkleDown),
-                    self.left_leg.ankle_down,
-                ),
-                ankle_up: (
-                    JointsName::LeftLeg(LegJoint::AnkleUp),
-                    self.left_leg.ankle_up,
-                ),
-                hip_pitch: (
-                    JointsName::LeftLeg(LegJoint::HipPitch),
-                    self.left_leg.hip_pitch,
-                ),
-                hip_roll: (
-                    JointsName::LeftLeg(LegJoint::HipRoll),
-                    self.left_leg.hip_roll,
-                ),
-                hip_yaw: (JointsName::LeftLeg(LegJoint::HipYaw), self.left_leg.hip_yaw),
-                knee: (JointsName::LeftLeg(LegJoint::Knee), self.left_leg.knee),
-            },
-            right_leg: LegJoints {
-                ankle_down: (
-                    JointsName::RightLeg(LegJoint::AnkleDown),
-                    self.right_leg.ankle_down,
-                ),
-                ankle_up: (
-                    JointsName::RightLeg(LegJoint::AnkleUp),
-                    self.right_leg.ankle_up,
-                ),
-                hip_pitch: (
-                    JointsName::RightLeg(LegJoint::HipPitch),
-                    self.right_leg.hip_pitch,
-                ),
-                hip_roll: (
-                    JointsName::RightLeg(LegJoint::HipRoll),
-                    self.right_leg.hip_roll,
-                ),
-                hip_yaw: (
-                    JointsName::RightLeg(LegJoint::HipYaw),
-                    self.right_leg.hip_yaw,
-                ),
-                knee: (JointsName::RightLeg(LegJoint::Knee), self.right_leg.knee),
-            },
-        }
-        .into_iter()
-    }
-
     pub fn body(self) -> BodyJoints<T> {
         BodyJoints {
             left_arm: self.left_arm,
             right_arm: self.right_arm,
             left_leg: self.left_leg,
             right_leg: self.right_leg,
-        }
-    }
-}
-
-impl<T> Index<JointsName> for Joints<T> {
-    type Output = T;
-
-    fn index(&self, index: JointsName) -> &Self::Output {
-        match index {
-            JointsName::Head(index) => &self.head[index],
-            JointsName::LeftArm(index) => &self.left_arm[index],
-            JointsName::RightArm(index) => &self.right_arm[index],
-            JointsName::LeftLeg(index) => &self.left_leg[index],
-            JointsName::RightLeg(index) => &self.right_leg[index],
-        }
-    }
-}
-
-impl<T> IndexMut<JointsName> for Joints<T> {
-    fn index_mut(&mut self, index: JointsName) -> &mut Self::Output {
-        match index {
-            JointsName::Head(index) => &mut self.head[index],
-            JointsName::LeftArm(index) => &mut self.left_arm[index],
-            JointsName::RightArm(index) => &mut self.right_arm[index],
-            JointsName::LeftLeg(index) => &mut self.left_leg[index],
-            JointsName::RightLeg(index) => &mut self.right_leg[index],
         }
     }
 }

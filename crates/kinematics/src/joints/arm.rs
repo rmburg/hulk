@@ -1,6 +1,6 @@
 use std::{
     f32::consts::PI,
-    ops::{Add, Div, Index, IndexMut, Mul, Sub},
+    ops::{Add, Div, Mul, Sub},
     time::Duration,
 };
 
@@ -8,14 +8,6 @@ use serde::{Deserialize, Serialize};
 use splines::impl_Interpolate;
 
 use super::mirror::Mirror;
-
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
-pub enum ArmJoint {
-    ShoulderPitch,
-    ShoulderRoll,
-    ShoulderYaw,
-    Elbow,
-}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
 pub struct ArmJoints<T = f32> {
@@ -139,30 +131,6 @@ impl Mirror for ArmJoints<f32> {
             shoulder_roll: -self.shoulder_roll,
             shoulder_yaw: -self.shoulder_yaw,
             elbow: -self.elbow,
-        }
-    }
-}
-
-impl<T> Index<ArmJoint> for ArmJoints<T> {
-    type Output = T;
-
-    fn index(&self, index: ArmJoint) -> &Self::Output {
-        match index {
-            ArmJoint::ShoulderPitch => &self.shoulder_pitch,
-            ArmJoint::ShoulderRoll => &self.shoulder_roll,
-            ArmJoint::ShoulderYaw => &self.shoulder_yaw,
-            ArmJoint::Elbow => &self.elbow,
-        }
-    }
-}
-
-impl<T> IndexMut<ArmJoint> for ArmJoints<T> {
-    fn index_mut(&mut self, index: ArmJoint) -> &mut Self::Output {
-        match index {
-            ArmJoint::ShoulderPitch => &mut self.shoulder_pitch,
-            ArmJoint::ShoulderRoll => &mut self.shoulder_roll,
-            ArmJoint::ShoulderYaw => &mut self.shoulder_yaw,
-            ArmJoint::Elbow => &mut self.elbow,
         }
     }
 }
