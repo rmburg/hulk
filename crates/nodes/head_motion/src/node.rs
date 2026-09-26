@@ -117,15 +117,6 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                         continue;
                     }
                 };
-                // This loop is the subscriber's only consumer. A ready sample can be
-                // taken immediately, including when both select branches were ready.
-                if low_state_sub.is_ready() {
-                    receive_observation(
-                        low_state_sub.recv_with_metadata().await,
-                        &mut controller, &mut logger,
-                        parameters.joint_control.warning_interval, node.clock().now(),
-                    );
-                }
                 let camera = camera_matrix_cache.get_latest();
                 let ground = ground_to_robot_cache.get_latest();
                 let limits = joint_limits_cache.get_latest();
@@ -153,8 +144,8 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                         continue;
                     }
                 };
-                logger.log_output(&request, &output, &parameters.joint_control, now);
-                if let Err(error) = reply.reply_async(&output.joint_control.commands).await {
+                logger.log_output(&request, &output, parameters.joint_control.warning_interval, now);
+                if let Err(error) = reply.reply_async(&output.commands).await {
                     logger.log_error(FailureKind::Response, Some(&request), &error.into(),
                         parameters.joint_control.warning_interval, now);
                 }
@@ -311,8 +302,8 @@ mod tests {
                 .unwrap();
             assert_eq!(active.yaw.position, 0.2);
             assert_eq!(active.pitch.position, 0.3);
-            assert_eq!(active.yaw.velocity, 0.4);
-            assert_eq!(active.pitch.velocity, -0.2);
+            assert_eq!(active.yaw.velocity, 0.0);
+            assert_eq!(active.pitch.velocity, 0.0);
             assert_eq!(active.yaw.kp, parameters.joint_control.kp.yaw);
             let damping = wait_for_reply_state(&client, &HeadMotion::Damping, true)
                 .await

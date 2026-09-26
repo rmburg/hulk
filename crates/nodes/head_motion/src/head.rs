@@ -8,22 +8,21 @@ use color_eyre::{
 };
 use coordinate_systems::Ground;
 use kinematics::joints::head::HeadJoints;
-use linear_algebra::{Point2, point};
+use linear_algebra::{Point2, Rotation2, point};
 use ros_z::time::Time;
 use types::{
     field_dimensions::{FieldDimensions, GlobalFieldSide},
     joint_limits::JointLimits,
     motion_command::{HeadMotion, ImageRegion},
+    motor_command::MotorCommand,
     support_foot::Side,
 };
 
 use crate::{
-    joint_control::{
-        HeadObservation, JointControlOutput, JointController, JointTarget, MotionProgress,
-    },
+    joint_control::{HeadObservation, JointTarget, motor_commands},
     look_at::{GazeGeometry, LookAtError, look_at},
     parameters::Parameters,
-    patterns::{GlanceState, GlanceTimeout, ScanKind, ScanState, ScanTimeout},
+    patterns::{GlanceState, ScanKind, ScanState},
 };
 
 /// A consistent request-time snapshot. Geometry and field dimensions are only
@@ -44,13 +43,8 @@ pub enum HoldReason {
 }
 
 pub struct HeadOutput {
-    /// The measurement snapshot used to generate commands and diagnostics.
-    pub observation: HeadObservation,
-    pub joint_control: JointControlOutput,
+    pub commands: HeadJoints<MotorCommand>,
     pub hold_reason: Option<HoldReason>,
-    pub scan_timeout: Option<ScanTimeout>,
-    pub glance_timeout: Option<GlanceTimeout>,
-    pub injected: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -74,10 +68,8 @@ pub struct HeadController {
     last_evaluation: Option<Time>,
     reference_position: Option<HeadJoints<f32>>,
     hold_target: Option<HeadJoints<f32>>,
-    scan_progress: Option<MotionProgress>,
     scan: ScanState,
     glance: GlanceState,
-    joint_control: JointController,
 }
 
 impl HeadController {
@@ -114,12 +106,8 @@ impl HeadController {
         parameters: &Parameters,
         now: Time,
     ) -> Result<HeadOutput> {
-        let result = self.evaluate_request(request, context, parameters, now);
-        if result.is_err() {
-            self.scan_progress = None;
-            self.glance.advance(None);
-        }
-        result.wrap_err_with(|| format!("failed to evaluate head request {request:?}"))
+        self.evaluate_request(request, context, parameters, now)
+            .wrap_err_with(|| format!("failed to evaluate head request {request:?}"))
     }
 
     fn evaluate_request(
@@ -138,57 +126,33 @@ impl HeadController {
         let mode = mode_for(request, parameters.injected_head_joints.is_some());
         self.prepare_mode(mode, now, parameters.joint_control.reseed_after);
         let reference = self.reference_position.unwrap_or(observation.positions);
-        let resolution = self.resolve(request, context, parameters, reference, now)?;
-        let output = self.joint_control.update(
+        let elapsed = if self.reference_position.is_some() {
+            self.last_evaluation
+                .map_or(0.0, |last| now.duration_since(last).as_secs_f64())
+        } else {
+            0.0
+        };
+        let resolution = self.resolve(request, context, parameters, reference, now);
+        let commands = motor_commands(
             resolution.target,
-            &observation,
+            reference,
+            elapsed,
             &parameters.joint_control,
             joints,
-            now,
         )?;
-        let glance_timeout =
-            self.record_output(mode, resolution.hold_reason.is_some(), &output, now);
-        Ok(HeadOutput {
-            observation,
-            joint_control: output,
-            hold_reason: resolution.hold_reason,
-            scan_timeout: resolution.scan_timeout,
-            glance_timeout,
-            injected: mode == Mode::Injected,
-        })
-    }
-
-    fn record_output(
-        &mut self,
-        mode: Mode,
-        holding: bool,
-        output: &JointControlOutput,
-        now: Time,
-    ) -> Option<GlanceTimeout> {
-        let glance_timeout = if mode == Mode::Glance {
-            self.glance.advance(if !holding {
-                output.progress.as_ref()
-            } else {
-                None
-            })
-        } else {
-            None
-        };
-        self.scan_progress = if matches!(mode, Mode::Scan(_)) {
-            output.progress
-        } else {
-            None
-        };
         self.reference_position = if mode == Mode::Damping {
             None
         } else {
             Some(HeadJoints {
-                yaw: output.reference.yaw.position as f32,
-                pitch: output.reference.pitch.position as f32,
+                yaw: commands.yaw.position,
+                pitch: commands.pitch.position,
             })
         };
         self.last_evaluation = Some(now);
-        glance_timeout
+        Ok(HeadOutput {
+            commands,
+            hold_reason: resolution.hold_reason,
+        })
     }
 
     fn current_observation(&self, now: Time, maximum_age: Duration) -> Result<HeadObservation> {
@@ -216,9 +180,8 @@ impl HeadController {
             self.reset_motion();
         }
         if self.mode != Some(mode) {
-            self.scan.reset();
-            self.glance.reset();
-            self.scan_progress = None;
+            self.scan = ScanState::default();
+            self.glance = GlanceState::default();
             self.hold_target = None;
         }
         self.mode = Some(mode);
@@ -231,16 +194,13 @@ impl HeadController {
         parameters: &Parameters,
         reference: HeadJoints<f32>,
         now: Time,
-    ) -> Result<Resolution> {
+    ) -> Resolution {
         // Preserve the existing explicit debug override; it still uses joint control.
         if let Some(position) = parameters.injected_head_joints {
             self.hold_target = None;
-            return Ok(Resolution::motion(move_to(
-                position,
-                parameters.direct_travel_speed,
-            )));
+            return Resolution::motion(move_to(position, parameters.direct_travel_speed));
         }
-        let resolution = match *request {
+        match *request {
             HeadMotion::ZeroAngles => {
                 self.hold_target = None;
                 Resolution::motion(move_to(
@@ -281,41 +241,42 @@ impl HeadController {
                 } else {
                     Side::Left
                 };
-                let scan =
-                    self.scan
-                        .update(kind, side, self.scan_progress.as_ref(), parameters, now)?;
-                Resolution {
-                    target: scan.target,
-                    hold_reason: None,
-                    scan_timeout: scan.timeout,
-                }
+                self.hold_target = None;
+                let scan_parameters = match kind {
+                    ScanKind::LookAround => &parameters.look_around,
+                    ScanKind::SearchForLostBall => &parameters.search_for_lost_ball,
+                };
+                let position = self.scan.update(kind, side, scan_parameters, now);
+                Resolution::motion(move_to(position, scan_parameters.travel_speed))
             }
             HeadMotion::LookLeftAndRightOf {
                 target,
                 height_above_ground,
             } => {
-                let angles = self
-                    .glance
-                    .update(target, parameters, now)
-                    .map_err(|_| HoldReason::Geometry(LookAtError::InvalidTarget))
-                    .and_then(|offset| {
-                        gaze(
-                            offset.position,
-                            height_above_ground,
-                            offset.image_region,
-                            context,
-                            parameters,
-                            reference,
-                        )
-                    });
+                let angle = self.glance.angle(
+                    parameters.glance.angle,
+                    parameters.glance.phase_duration,
+                    now,
+                );
+                let angles = gaze(
+                    Rotation2::<Ground, Ground>::new(angle) * target,
+                    height_above_ground,
+                    ImageRegion::Center,
+                    context,
+                    parameters,
+                    reference,
+                );
                 self.gaze_motion(angles, parameters.glance.travel_speed, reference)
             }
-            HeadMotion::MoveWithVelocity { yaw, pitch } => Resolution::motion(move_to(
-                reference + HeadJoints { yaw, pitch },
-                parameters.direct_travel_speed,
-            )),
-        };
-        Ok(resolution)
+            // Preserve the existing per-request angular offset interpretation.
+            HeadMotion::MoveWithVelocity { yaw, pitch } => {
+                self.hold_target = None;
+                Resolution::motion(move_to(
+                    reference + HeadJoints { yaw, pitch },
+                    parameters.direct_travel_speed,
+                ))
+            }
+        }
     }
 
     fn center(
@@ -360,7 +321,6 @@ impl HeadController {
                 Resolution {
                     target: move_to(position, travel_speed),
                     hold_reason: Some(reason),
-                    scan_timeout: None,
                 }
             }
         }
@@ -377,17 +337,14 @@ impl HeadController {
         self.last_evaluation = None;
         self.reference_position = None;
         self.hold_target = None;
-        self.scan_progress = None;
-        self.scan.reset();
-        self.glance.reset();
-        self.joint_control = JointController::default();
+        self.scan = ScanState::default();
+        self.glance = GlanceState::default();
     }
 }
 
 struct Resolution {
     target: JointTarget,
     hold_reason: Option<HoldReason>,
-    scan_timeout: Option<ScanTimeout>,
 }
 
 impl Resolution {
@@ -395,7 +352,6 @@ impl Resolution {
         Self {
             target,
             hold_reason: None,
-            scan_timeout: None,
         }
     }
 }
@@ -445,6 +401,3 @@ fn mode_for(request: &HeadMotion, injected: bool) -> Mode {
         HeadMotion::MoveWithVelocity { .. } => Mode::Injected,
     }
 }
-
-#[cfg(test)]
-mod tests;

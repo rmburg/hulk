@@ -15,7 +15,6 @@ linear_algebra = { workspace = true }
 projection = { workspace = true }
 ros-z = { workspace = true }
 ros-z-schema = { workspace = true }
-rsruckig.workspace = true
 serde = { workspace = true, features = ["derive"] }
 tokio.workspace = true
 tracing.workspace = true
@@ -23,4 +22,3 @@ types = { workspace = true }
 
 [dev-dependencies]
 json5.workspace = true
-tracing-subscriber.workspace = true
