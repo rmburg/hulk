@@ -22,10 +22,7 @@ use types::motor_command::MotorCommand;
 pub use crate::config::Parameters;
 use crate::{
     config::Policy,
-    inference::{
-        GetUpCommand, Inference, InferenceCommand, InferenceOutput, InferenceRequest,
-        InferenceResponse, KickCommand, WalkCommand,
-    },
+    inference::{GetUpCommand, Inference, InferenceCommand, KickCommand, WalkCommand},
     observation::{SensorFrame, VelocityEstimator},
 };
 
@@ -37,8 +34,8 @@ macro_rules! inference_service {
     ($name:ident, $command:ty, $joints:ty) => {
         pub struct $name;
         impl Service for $name {
-            type Request = InferenceRequest<$command>;
-            type Response = InferenceResult<InferenceResponse<$joints>>;
+            type Request = $command;
+            type Response = InferenceResult<$joints>;
         }
         impl ServiceTypeInfo for $name {
             fn service_type_info() -> TypeInfo {
@@ -104,9 +101,7 @@ pub enum State {
 
 #[derive(Clone, Serialize, Deserialize, Message)]
 pub struct Timing {
-    pub generation: u64,
     pub policy: Policy,
-    pub requested_at: Time,
     pub received_at: Time,
     pub started_at: Time,
     pub completed_at: Time,
@@ -117,7 +112,7 @@ pub struct Timing {
 }
 
 struct Pending {
-    request: InferenceRequest<InferenceCommand>,
+    request: InferenceCommand,
     reply: InferenceReply,
     received_at: Time,
 }
@@ -218,7 +213,12 @@ async fn run(ctx: Arc<Context>) -> Result<()> {
     .await
 }
 
-type WorkerResult = (Inference, Result<InferenceOutput>, Duration);
+type WorkerResult = (
+    Inference,
+    Result<Box<Joints<MotorCommand>>>,
+    Policy,
+    Duration,
+);
 
 struct Runtime {
     parameters: Arc<Parameters>,
@@ -231,7 +231,6 @@ struct Runtime {
     joint_limits: Option<Arc<JointLimits>>,
     velocity: VelocityEstimator,
     last_position: Option<(Policy, Joints<f32>)>,
-    generation: u64,
     fault: Option<Arc<Report>>,
 }
 
@@ -252,7 +251,6 @@ impl Runtime {
             joint_limits: None,
             velocity: VelocityEstimator::default(),
             last_position: None,
-            generation: 0,
             fault: None,
         }
     }
@@ -358,23 +356,7 @@ impl Runtime {
     }
 
     async fn enqueue(&mut self, pending: Pending) {
-        let request = pending.request;
-        if request.generation < self.generation {
-            pending.reject(InferenceError::Superseded).await;
-            return;
-        }
-        if request.requested_at > self.clock.now() || self.clock.now() >= request.valid_until {
-            pending.reject(InferenceError::Expired).await;
-            return;
-        }
-        if request.generation > self.generation {
-            self.generation = request.generation;
-            if let Some(controller) = &mut self.controller {
-                controller.reset();
-            }
-            self.last_position = None;
-            self.fault = None;
-        }
+        self.fault = None;
         if let Some(old) = self.pending.replace(pending) {
             old.reject(InferenceError::Superseded).await;
         }
@@ -383,10 +365,6 @@ impl Runtime {
     async fn dispatch(&mut self) {
         let pending = self.pending.take().expect("pending request");
         let now = self.clock.now();
-        if now >= pending.request.valid_until {
-            pending.reject(InferenceError::Expired).await;
-            return;
-        }
         if let Some(source) = &self.fault {
             pending
                 .reject(InferenceError::Fault {
@@ -407,7 +385,7 @@ impl Runtime {
         sensor.last_commanded_position = match self.last_position {
             Some((policy, _))
                 if policy.is_locomotion()
-                    && matches!(pending.request.command, InferenceCommand::GetUp(_)) =>
+                    && matches!(pending.request, InferenceCommand::GetUp(_)) =>
             {
                 sensor.position
             }
@@ -426,12 +404,12 @@ impl Runtime {
             let result = controller.execute_request(
                 clock.now(),
                 &sensor,
-                request.command,
+                request,
                 velocity,
                 &limits,
                 parameters,
             );
-            (controller, result, start.elapsed())
+            (controller, result, request.policy(), start.elapsed())
         }));
     }
 
@@ -442,11 +420,9 @@ impl Runtime {
     ) -> Result<()> {
         self.worker = None;
         let (pending, started_at, sensor_time) = self.active.take().expect("active request");
-        let (mut controller, result, compute_duration) = completed;
+        let (mut controller, result, policy, compute_duration) = completed;
         let now = self.clock.now();
-        let valid = pending.request.generation == self.generation
-            && now < pending.request.valid_until
-            && now >= sensor_time
+        let valid = now >= sensor_time
             && now.duration_since(sensor_time) <= self.parameters.timing.maximum_sensor_age;
         let result = if let Some(source) = &self.fault {
             controller.reset();
@@ -467,9 +443,8 @@ impl Runtime {
         };
         if let Ok(output) = &result {
             self.last_position = Some((
-                output.execution.policy,
+                policy,
                 output
-                    .joints
                     .as_ref()
                     .into_iter()
                     .map(|joint| joint.position)
@@ -479,9 +454,7 @@ impl Runtime {
         self.controller = Some(controller);
         timings
             .publish(&Timing {
-                generation: pending.request.generation,
-                policy: pending.request.command.policy(),
-                requested_at: pending.request.requested_at,
+                policy: pending.request.policy(),
                 received_at: pending.received_at,
                 started_at,
                 completed_at: now,

@@ -1,11 +1,14 @@
 use crate::{
-    inference::{InferenceCommand, InferenceOutput, InferenceRequest, InferenceResponse},
+    inference::InferenceCommand,
     node::{
         GETUP_INFERENCE_SERVICE, GetUpInferenceService, InferenceResult, KICK_INFERENCE_SERVICE,
         KickInferenceService, WALK_INFERENCE_SERVICE, WalkInferenceService,
     },
 };
-use kinematics::joints::body::{BodyJoints, LowerBodyJoints};
+use kinematics::joints::{
+    Joints,
+    body::{BodyJoints, LowerBodyJoints},
+};
 use ros_z::{
     prelude::*,
     service::{ServiceReply, ServiceServer},
@@ -37,21 +40,19 @@ impl Requests {
                 .await?,
         })
     }
-    pub async fn receive(
-        &mut self,
-    ) -> ros_z::Result<(InferenceRequest<InferenceCommand>, InferenceReply)> {
+    pub async fn receive(&mut self) -> ros_z::Result<(InferenceCommand, InferenceReply)> {
         tokio::select! {
             received = self.walk.take_request_async() => {
                 let (request, reply) = received?.into_parts();
-                Ok((request.map_command(InferenceCommand::Walk), InferenceReply::Walk(reply)))
+                Ok((InferenceCommand::Walk(request), InferenceReply::Walk(reply)))
             }
             received = self.kick.take_request_async() => {
                 let (request, reply) = received?.into_parts();
-                Ok((request.map_command(InferenceCommand::Kick), InferenceReply::Kick(reply)))
+                Ok((InferenceCommand::Kick(request), InferenceReply::Kick(reply)))
             }
             received = self.get_up.take_request_async() => {
                 let (request, reply) = received?.into_parts();
-                Ok((request.map_command(InferenceCommand::GetUp), InferenceReply::GetUp(reply)))
+                Ok((InferenceCommand::GetUp(request), InferenceReply::GetUp(reply)))
             }
         }
     }
@@ -63,7 +64,7 @@ pub(super) enum InferenceReply {
     GetUp(ServiceReply<GetUpInferenceService>),
 }
 impl InferenceReply {
-    pub async fn respond(self, result: InferenceResult<InferenceOutput>) {
+    pub async fn respond(self, result: InferenceResult<Box<Joints<MotorCommand>>>) {
         match self {
             Self::Walk(reply) => {
                 let _ = reply.reply_async(&result.map(lower_body)).await;
@@ -73,18 +74,12 @@ impl InferenceReply {
             }
             Self::GetUp(reply) => {
                 let _ = reply
-                    .reply_async(&result.map(|output| InferenceResponse {
-                        joints: output.joints,
-                        execution: output.execution,
-                    }))
+                    .reply_async(&result.map(|boxed| boxed.as_ref().clone()))
                     .await;
             }
         }
     }
 }
-fn lower_body(output: InferenceOutput) -> InferenceResponse<LowerBodyJoints<MotorCommand>> {
-    InferenceResponse {
-        joints: Box::new(LowerBodyJoints::from(BodyJoints::from(*output.joints))),
-        execution: output.execution,
-    }
+fn lower_body(output: Box<Joints<MotorCommand>>) -> LowerBodyJoints<MotorCommand> {
+    LowerBodyJoints::from(BodyJoints::from(*output))
 }

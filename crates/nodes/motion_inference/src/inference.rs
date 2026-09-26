@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use coordinate_systems::Ground;
 use kinematics::joints::Joints;
 use linear_algebra::Vector2;
-use ros_z::{Message, time::Time};
+use ros_z::time::Time;
 use types::joint_limits::JointLimits;
 use types::motor_command::MotorCommand;
 
@@ -49,45 +49,6 @@ pub enum InferenceCommand {
     Walk(WalkCommand),
     Kick(KickCommand),
     GetUp(GetUpCommand),
-}
-
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Message)]
-pub struct InferenceRequest<C> {
-    pub generation: u64,
-    pub requested_at: Time,
-    pub valid_until: Time,
-    pub command: C,
-}
-
-impl<C> InferenceRequest<C> {
-    pub(crate) fn map_command<D>(self, map: impl FnOnce(C) -> D) -> InferenceRequest<D> {
-        InferenceRequest {
-            generation: self.generation,
-            requested_at: self.requested_at,
-            valid_until: self.valid_until,
-            command: map(self.command),
-        }
-    }
-}
-
-/// Policy execution metadata accompanies only the joints produced by that service.
-#[derive(Clone, Serialize, Deserialize, Message)]
-pub struct InferenceResponse<J> {
-    pub joints: Box<J>,
-    pub execution: PolicyExecution,
-}
-
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Message)]
-pub struct PolicyExecution {
-    pub policy: Policy,
-    pub started_at: Time,
-    pub progress: Option<f32>,
-    pub sensor_time: Time,
-}
-
-pub(crate) struct InferenceOutput {
-    pub joints: Box<Joints<MotorCommand>>,
-    pub execution: PolicyExecution,
 }
 
 impl InferenceCommand {
@@ -170,7 +131,7 @@ impl Inference {
         velocity: VelocityEstimator,
         joints: &JointLimits,
         parameters: Arc<Parameters>,
-    ) -> Result<InferenceOutput> {
+    ) -> Result<Box<Joints<MotorCommand>>> {
         self.update_parameters(parameters);
         self.validate_update(now, sensor, request)?;
         self.velocity = velocity;
@@ -257,7 +218,7 @@ impl Inference {
         request: InferenceCommand,
         standing: bool,
         joints: &JointLimits,
-    ) -> Result<InferenceOutput> {
+    ) -> Result<Box<Joints<MotorCommand>>> {
         let active = self
             .active
             .as_mut()
@@ -272,18 +233,7 @@ impl Inference {
             .run(&observation)?;
         let joints = active.decode(sensor, &raw_output, joints);
         ensure!(joints_are_finite(&joints), "non-finite decoded joints");
-        Ok(InferenceOutput {
-            joints: Box::new(joints),
-            execution: PolicyExecution {
-                policy,
-                started_at: active.started_at,
-                progress: match &active.state {
-                    State::SlowGetUp(state) => Some(state.progress(now)),
-                    _ => None,
-                },
-                sensor_time: sensor.timestamp,
-            },
-        })
+        Ok(Box::new(joints))
     }
 }
 
@@ -294,7 +244,6 @@ enum State {
 }
 
 struct Execution {
-    started_at: Time,
     policy: Policy,
     state: State,
 }
@@ -314,11 +263,7 @@ impl Execution {
             Policy::SlowGetUp => State::SlowGetUp(GetUp::new(sensor, now, parameters)),
             Policy::FastGetUp => State::FastGetUp(GetUp::new(sensor, now, parameters)),
         };
-        Self {
-            started_at: now,
-            policy,
-            state,
-        }
+        Self { policy, state }
     }
 
     fn advance(&mut self, seconds: f32, standing: bool) {
