@@ -16,7 +16,7 @@ use kinematics::joints::{
 };
 use linear_algebra::vector;
 use motion_inference::{
-    inference::{GetUpCommand, KickCommand, WalkCommand, joints_are_finite},
+    inference::{GetUpCommand, InferenceRequest, KickCommand, WalkCommand, joints_are_finite},
     locomotion::{KickRequest, leg},
     node::{
         GETUP_INFERENCE_SERVICE, GetUpInferenceService, KICK_INFERENCE_SERVICE,
@@ -296,12 +296,20 @@ impl MotionState {
             {
                 let inference_result = self
                     .get_up_inference_client
-                    .call_with_timeout_async(&command, parameters.inference_timeout)
+                    .call_with_timeout_async(
+                        &InferenceRequest {
+                            generation: 0, // Hack to make it compile, will be removed later
+                            requested_at: now,
+                            valid_until: now + Duration::from_millis(200),
+                            command,
+                        },
+                        parameters.inference_timeout,
+                    )
                     .await;
 
                 match inference_result {
                     Ok(Ok(joints_command)) => RobotCommand::Custom {
-                        joints_command: joints_command.as_ref().clone(),
+                        joints_command: joints_command.joints.as_ref().clone(),
                     },
                     Ok(Err(inference_error)) => {
                         error!(
@@ -323,9 +331,15 @@ impl MotionState {
                 head_motion,
                 command,
             } => {
+                let inference_request = InferenceRequest {
+                    generation: 0, // Hack to make it compile, will be removed later
+                    requested_at: now,
+                    valid_until: now + Duration::from_millis(100),
+                    command,
+                };
                 let inference_fut = self
                     .walk_inference_client
-                    .call_with_timeout_async(&command, parameters.inference_timeout);
+                    .call_with_timeout_async(&inference_request, parameters.inference_timeout);
                 let head_motion_fut = self
                     .head_motion_client
                     .call_with_timeout_async(&head_motion, parameters.head_motion_timeout);
@@ -343,7 +357,7 @@ impl MotionState {
 
                 let lower_body_command = match inference_result {
                     Ok(Ok(joints_command)) => LowerRobotCommand::Custom {
-                        lower_body_joints_command: joints_command.as_ref().clone(),
+                        lower_body_joints_command: joints_command.joints.as_ref().clone(),
                     },
                     Ok(Err(inference_error)) => {
                         error!(
@@ -397,9 +411,15 @@ impl MotionState {
                 head_motion,
                 command,
             } => {
+                let inference_request = InferenceRequest {
+                    generation: 0, // Hack to make it compile, will be removed later
+                    requested_at: now,
+                    valid_until: now + Duration::from_millis(100),
+                    command,
+                };
                 let inference_fut = self
                     .kick_inference_client
-                    .call_with_timeout_async(&command, parameters.inference_timeout);
+                    .call_with_timeout_async(&inference_request, parameters.inference_timeout);
                 let head_motion_fut = self
                     .head_motion_client
                     .call_with_timeout_async(&head_motion, parameters.head_motion_timeout);
@@ -417,7 +437,7 @@ impl MotionState {
 
                 let lower_body_command = match inference_result {
                     Ok(Ok(joints_command)) => LowerRobotCommand::Custom {
-                        lower_body_joints_command: joints_command.as_ref().clone(),
+                        lower_body_joints_command: joints_command.joints.as_ref().clone(),
                     },
                     Ok(Err(inference_error)) => {
                         error!(
