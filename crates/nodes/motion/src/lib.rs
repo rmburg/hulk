@@ -12,7 +12,6 @@ use kinematics::joints::{
     Joints,
     body::{BodyJoints, LowerBodyJoints, UpperBodyJoints},
     head::HeadJoints,
-    leg::LegJoints,
 };
 use linear_algebra::vector;
 use motion_inference::{
@@ -553,60 +552,10 @@ impl MotionState {
     ) -> Result<UpperBodyJoints<MotorCommand>> {
         let elapsed = clock.now().duration_since(self.last_arms.time);
 
-        let legs: LowerBodyJoints = LowerBodyJoints {
-            left_leg: LegJoints {
-                hip_pitch: legs.left_leg.hip_pitch.position.clamp(
-                    joint_limits.position.left_leg.hip_pitch[0],
-                    joint_limits.position.left_leg.hip_pitch[1],
-                ),
-                hip_roll: legs.left_leg.hip_roll.position.clamp(
-                    joint_limits.position.left_leg.hip_roll[0],
-                    joint_limits.position.left_leg.hip_roll[1],
-                ),
-                hip_yaw: legs.left_leg.hip_yaw.position.clamp(
-                    joint_limits.position.left_leg.hip_yaw[0],
-                    joint_limits.position.left_leg.hip_yaw[1],
-                ),
-                knee: legs.left_leg.knee.position.clamp(
-                    joint_limits.position.left_leg.knee[0],
-                    joint_limits.position.left_leg.knee[1],
-                ),
-                ankle_up: legs.left_leg.ankle_up.position.clamp(
-                    joint_limits.position.left_leg.ankle_up[0],
-                    joint_limits.position.left_leg.ankle_up[1],
-                ),
-                ankle_down: legs.left_leg.ankle_down.position.clamp(
-                    joint_limits.position.left_leg.ankle_down[0],
-                    joint_limits.position.left_leg.ankle_down[1],
-                ),
-            },
-            right_leg: LegJoints {
-                hip_pitch: legs.right_leg.hip_pitch.position.clamp(
-                    joint_limits.position.right_leg.hip_pitch[0],
-                    joint_limits.position.right_leg.hip_pitch[1],
-                ),
-                hip_roll: legs.right_leg.hip_roll.position.clamp(
-                    joint_limits.position.right_leg.hip_roll[0],
-                    joint_limits.position.right_leg.hip_roll[1],
-                ),
-                hip_yaw: legs.right_leg.hip_yaw.position.clamp(
-                    joint_limits.position.right_leg.hip_yaw[0],
-                    joint_limits.position.right_leg.hip_yaw[1],
-                ),
-                knee: legs.right_leg.knee.position.clamp(
-                    joint_limits.position.right_leg.knee[0],
-                    joint_limits.position.right_leg.knee[1],
-                ),
-                ankle_up: legs.right_leg.ankle_up.position.clamp(
-                    joint_limits.position.right_leg.ankle_up[0],
-                    joint_limits.position.right_leg.ankle_up[1],
-                ),
-                ankle_down: legs.right_leg.ankle_down.position.clamp(
-                    joint_limits.position.right_leg.ankle_down[0],
-                    joint_limits.position.right_leg.ankle_down[1],
-                ),
-            },
-        };
+        let legs = legs
+            .clone() // I hate this and will fix it later
+            .map(|motor_command| motor_command.position)
+            .clamp(BodyJoints::from(joint_limits.position).into());
 
         let ratio =
             (elapsed.as_secs_f32() / parameters.arm_blend_duration.as_secs_f32()).clamp(0.0, 1.0);

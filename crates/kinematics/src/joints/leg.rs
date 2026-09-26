@@ -67,6 +67,22 @@ impl LegJoints<f32> {
             ankle_down: self.ankle_down.clamp(min.ankle_down, max.ankle_down),
         }
     }
+
+    // this is awful, I'll clean up this duplicate function later
+    pub fn clamp2(self, limits: LegJoints<[f32; 2]>) -> Self {
+        Self {
+            hip_pitch: self
+                .hip_pitch
+                .clamp(limits.hip_pitch[0], limits.hip_pitch[1]),
+            hip_roll: self.hip_roll.clamp(limits.hip_roll[0], limits.hip_roll[1]),
+            hip_yaw: self.hip_yaw.clamp(limits.hip_yaw[0], limits.hip_yaw[1]),
+            knee: self.knee.clamp(limits.knee[0], limits.knee[1]),
+            ankle_up: self.ankle_up.clamp(limits.ankle_up[0], limits.ankle_up[1]),
+            ankle_down: self
+                .ankle_down
+                .clamp(limits.ankle_down[0], limits.ankle_down[1]),
+        }
+    }
 }
 
 impl<'a, T> IntoIterator for &'a LegJoints<T> {

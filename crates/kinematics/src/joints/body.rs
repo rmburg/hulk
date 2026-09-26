@@ -150,6 +150,24 @@ pub struct LowerBodyJoints<T = f32> {
     pub right_leg: LegJoints<T>,
 }
 
+impl LowerBodyJoints<f32> {
+    pub fn clamp(self, limits: LowerBodyJoints<[f32; 2]>) -> Self {
+        Self {
+            left_leg: self.left_leg.clamp2(limits.left_leg),
+            right_leg: self.right_leg.clamp2(limits.right_leg),
+        }
+    }
+}
+
+impl<T> LowerBodyJoints<T> {
+    pub fn map<U>(self, f: impl Fn(T) -> U) -> LowerBodyJoints<U> {
+        LowerBodyJoints {
+            left_leg: self.left_leg.map(&f),
+            right_leg: self.right_leg.map(&f),
+        }
+    }
+}
+
 impl<T> LowerBodyJoints<T>
 where
     T: Clone,
