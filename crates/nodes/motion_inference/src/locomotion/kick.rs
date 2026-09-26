@@ -35,6 +35,7 @@ pub struct Observation {
 }
 
 impl Observation {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         state: &Locomotion,
         sensor: &SensorFrame,
