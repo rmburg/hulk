@@ -70,6 +70,7 @@ struct Parameters {
     walking: WalkingParameters,
     inference_timeout: Duration,
     head_motion_timeout: Duration,
+    maximum_command_age: Duration,
 }
 
 pub fn run_boxed(ctx: Arc<Context>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {
@@ -162,12 +163,28 @@ async fn run(ctx: Arc<Context>) -> Result<()> {
 
         let parameters = &parameters.snapshot().typed;
 
-        // TODO: Expire motion command after certain duration
-        let motion_command = motion_command_cache.get_latest().unwrap_or_else(|| {
-            warn!("behavior did not provide a motion command (yet)!");
+        let motion_command = match motion_command_cache.get_latest_with_stamp() {
+            Some((timestamp, motion_command)) => {
+                let age = now.duration_since(timestamp);
 
-            Arc::new(MotionCommand::Damping)
-        });
+                if age > parameters.maximum_command_age {
+                    error!(
+                        "motion command is too old, falling back to damping. command age: {} ms, maximum: {} ms",
+                        age.as_millis(),
+                        parameters.maximum_command_age.as_millis()
+                    );
+
+                    Arc::new(MotionCommand::Damping)
+                } else {
+                    motion_command
+                }
+            }
+            None => {
+                warn!("behavior did not provide a motion command (yet)!");
+
+                Arc::new(MotionCommand::Damping)
+            }
+        };
 
         let motion_plan = MotionPlan::from_motion_command(&motion_command, &parameters.walking);
 
