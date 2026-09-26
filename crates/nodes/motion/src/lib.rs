@@ -28,6 +28,7 @@ use ros_z::{
     context::Context,
     node::Node,
     parameter::NodeParametersExt,
+    pubsub::Publisher,
     qos::{QosDurability, QosProfile},
     service::ServiceClient,
     time::Clock,
@@ -94,6 +95,12 @@ async fn run(ctx: Arc<Context>) -> Result<()> {
         .await
         .wrap_err("failed to build motion_command subscriber")?;
 
+    let motion_emergency_stop_pub = node
+        .publisher::<()>("motion/emergency_stop")
+        .build()
+        .await
+        .wrap_err("failed to build emergency stop publisher")?;
+
     let robot_command_pub = node
         .publisher::<RobotCommand>(ROBOT_COMMAND_TOPIC)
         .build()
@@ -147,6 +154,7 @@ async fn run(ctx: Arc<Context>) -> Result<()> {
         walk_inference_client,
         kick_inference_client,
         get_up_inference_client,
+        motion_emergency_stop_pub,
 
         // TODO probably bad defaults
         last_arms: TimeWrapper {
@@ -174,6 +182,8 @@ async fn run(ctx: Arc<Context>) -> Result<()> {
                         parameters.maximum_command_age.as_millis()
                     );
 
+                    motion_state.send_emergency_stop_signal().await?;
+
                     Arc::new(MotionCommand::Damping)
                 } else {
                     motion_command
@@ -190,7 +200,7 @@ async fn run(ctx: Arc<Context>) -> Result<()> {
 
         let robot_command = motion_state
             .infer(motion_plan, clock, parameters, &joint_limits)
-            .await;
+            .await?;
 
         robot_command_pub.publish(&robot_command).await?;
     }
@@ -201,6 +211,7 @@ struct MotionState {
     walk_inference_client: ServiceClient<WalkInferenceService>,
     kick_inference_client: ServiceClient<KickInferenceService>,
     get_up_inference_client: ServiceClient<GetUpInferenceService>,
+    motion_emergency_stop_pub: Publisher<()>,
     last_arms: TimeWrapper<UpperBodyJoints<f32>>,
 }
 
@@ -304,7 +315,7 @@ impl MotionState {
         clock: &Clock,
         parameters: &Parameters,
         joint_limits: &JointLimits,
-    ) -> RobotCommand {
+    ) -> Result<RobotCommand> {
         let now = clock.now();
 
         let robot_command = match motion_plan {
@@ -322,6 +333,8 @@ impl MotionState {
                         error!(
                             "GetUp Inference failed, sending RobotCommand::Damping: {inference_error}"
                         );
+
+                        self.send_emergency_stop_signal().await?;
 
                         RobotCommand::Damping
                     }
@@ -365,12 +378,16 @@ impl MotionState {
                             "Walk inference failed, sending RobotCommand::Damping: {inference_error}"
                         );
 
+                        self.send_emergency_stop_signal().await?;
+
                         LowerRobotCommand::Damping
                     }
                     Err(ros_z_error) => {
                         error!(
                             "Failed to call walk inference service, sending RobotCommand::Damping! {ros_z_error}"
                         );
+
+                        self.send_emergency_stop_signal().await?;
 
                         LowerRobotCommand::Damping
                     }
@@ -439,12 +456,16 @@ impl MotionState {
                             "Walk inference failed, sending RobotCommand::Damping: {inference_error}"
                         );
 
+                        self.send_emergency_stop_signal().await?;
+
                         LowerRobotCommand::Damping
                     }
                     Err(ros_z_error) => {
                         error!(
                             "Failed to call GetUp inference service, sending RobotCommand::Damping! {ros_z_error}"
                         );
+
+                        self.send_emergency_stop_signal().await?;
 
                         LowerRobotCommand::Damping
                     }
@@ -484,10 +505,16 @@ impl MotionState {
             }
         };
 
-        let robot_command = robot_command.clamp(joint_limits).unwrap_or_else(|error| {
-            error!("Invalid final robot command, sending RobotCommand::Damping: {error:#}");
-            RobotCommand::Damping
-        });
+        let robot_command = match robot_command.clamp(joint_limits) {
+            Ok(robot_command) => robot_command,
+            Err(error) => {
+                error!("Invalid final robot command, sending RobotCommand::Damping: {error:#}");
+
+                self.send_emergency_stop_signal().await?;
+
+                RobotCommand::Damping
+            }
+        };
 
         if let RobotCommand::Custom { joints_command } = &robot_command {
             self.last_arms = TimeWrapper {
@@ -498,7 +525,7 @@ impl MotionState {
             };
         }
 
-        robot_command
+        Ok(robot_command)
     }
 
     fn generate_walking_arm_joints(
@@ -611,6 +638,12 @@ impl MotionState {
             left_arm: joints.left_arm,
             right_arm: joints.right_arm,
         })
+    }
+
+    async fn send_emergency_stop_signal(&self) -> Result<()> {
+        self.motion_emergency_stop_pub.publish(&()).await?;
+
+        Ok(())
     }
 }
 
