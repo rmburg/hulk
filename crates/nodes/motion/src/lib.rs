@@ -361,13 +361,21 @@ impl MotionState {
                 let (inference_result, head_motion_result) =
                     tokio::join!(inference_fut, head_motion_fut);
 
-                let head = head_motion_result.unwrap_or_else(|ros_z_error| {
-                    error!(
-                        "Failed to call head motion service, using fallback joints: {ros_z_error}"
-                    );
+                let head = match head_motion_result {
+                    Ok(Ok(head_joints)) => head_joints,
+                    Ok(Err(head_motion_error)) => {
+                        error!("Head motion failed, damping head joints: {head_motion_error}");
 
-                    HeadJoints::fill(MotorCommand::damping())
-                });
+                        HeadJoints::fill(MotorCommand::damping())
+                    }
+                    Err(ros_z_error) => {
+                        error!(
+                            "Failed to call HeadMotion service, damping head motion! {ros_z_error}"
+                        );
+
+                        HeadJoints::fill(MotorCommand::damping())
+                    }
+                };
 
                 let lower_body_command = match inference_result {
                     Ok(Ok(joints_command)) => LowerRobotCommand::Custom {
@@ -439,13 +447,21 @@ impl MotionState {
                 let (inference_result, head_motion_result) =
                     tokio::join!(inference_fut, head_motion_fut);
 
-                let head = head_motion_result.unwrap_or_else(|ros_z_error| {
-                    error!(
-                        "Failed to call head motion service, using fallback joints: {ros_z_error}"
-                    );
+                let head = match head_motion_result {
+                    Ok(Ok(head_joints)) => head_joints,
+                    Ok(Err(head_motion_error)) => {
+                        error!("Head motion failed, damping head joints: {head_motion_error}");
 
-                    HeadJoints::fill(MotorCommand::damping())
-                });
+                        HeadJoints::fill(MotorCommand::damping())
+                    }
+                    Err(ros_z_error) => {
+                        error!(
+                            "Failed to call HeadMotion service, damping head motion! {ros_z_error}"
+                        );
+
+                        HeadJoints::fill(MotorCommand::damping())
+                    }
+                };
 
                 let lower_body_command = match inference_result {
                     Ok(Ok(joints_command)) => LowerRobotCommand::Custom {

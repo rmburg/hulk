@@ -14,6 +14,7 @@ use ros_z::{
     time::Time,
 };
 use ros_z_schema::{ServiceDef, compute_hash};
+use serde::{Deserialize, Serialize};
 use types::motor_command::MotorCommand;
 use types::{
     field_dimensions::FieldDimensions, filtered_game_controller_state::FilteredGameControllerState,
@@ -22,7 +23,6 @@ use types::{
 
 use crate::{
     head::{HeadContext, HeadController},
-    joint_control::HeadObservation,
     logging::{FailureKind, NodeLogger},
     look_at::GazeGeometry,
     parameters::Parameters,
@@ -134,18 +134,18 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                     field_side: game.as_deref().map(|game| game.global_field_side),
                 };
                 let now = node.clock().now();
-                let output = match controller.evaluate(&request, &context, parameters, now) {
-                    Ok(output) => output,
+                let response = match controller.evaluate(&request, &context, parameters, now) {
+                    Ok(output) => {
+                        logger.log_output(&request, &output, parameters.joint_control.warning_interval, now);
+                        Ok(output.commands)
+                    }
                     Err(error) => {
                         logger.log_error(FailureKind::Request, Some(&request), &error,
                             parameters.joint_control.warning_interval, now);
-                        // The response contract contains commands only. Dropping the
-                        // reply lets central motion's timed call fail without commands.
-                        continue;
+                        Err(HeadMotionError { source: Arc::new(error) })
                     }
                 };
-                logger.log_output(&request, &output, parameters.joint_control.warning_interval, now);
-                if let Err(error) = reply.reply_async(&output.commands).await {
+                if let Err(error) = reply.reply_async(&response).await {
                     logger.log_error(FailureKind::Response, Some(&request), &error.into(),
                         parameters.joint_control.warning_interval, now);
                 }
@@ -162,7 +162,12 @@ fn receive_observation(
     now: Time,
 ) {
     let result = received.map_err(Report::new).and_then(|received| {
-        observe_low_state(controller, &received.message, received.source_time)
+        let head = received
+            .message
+            .serial_motor_states()
+            .wrap_err("invalid serial motor states in LowState")?
+            .head;
+        controller.observe(head.into(), received.source_time)
     });
     if let Err(error) = result {
         controller.invalidate_observation();
@@ -176,31 +181,18 @@ fn receive_observation(
     }
 }
 
-fn observe_low_state(controller: &mut HeadController, state: &LowState, time: Time) -> Result<()> {
-    let head = state
-        .serial_motor_states()
-        .wrap_err("invalid serial motor states in LowState")?
-        .head;
-    controller.observe(
-        HeadObservation {
-            positions: HeadJoints {
-                yaw: head.yaw.position,
-                pitch: head.pitch.position,
-            },
-            velocities: HeadJoints {
-                yaw: head.yaw.velocity,
-                pitch: head.pitch.velocity,
-            },
-        },
-        time,
-    )
-}
-
 pub struct HeadMotionService;
+
+#[derive(Clone, Debug, Serialize, Deserialize, Message, thiserror::Error)]
+#[error("head motion failed: {source:#}")]
+pub struct HeadMotionError {
+    #[serde(with = "ros_z::message::report")]
+    pub source: Arc<Report>,
+}
 
 impl Service for HeadMotionService {
     type Request = HeadMotion;
-    type Response = HeadJoints<MotorCommand>;
+    type Response = Result<HeadJoints<MotorCommand>, HeadMotionError>;
 }
 
 impl ServiceTypeInfo for HeadMotionService {
@@ -208,7 +200,7 @@ impl ServiceTypeInfo for HeadMotionService {
         let descriptor = ServiceDef::new(
             "head_motion::node::HeadMotionService",
             HeadMotion::type_name(),
-            HeadJoints::<MotorCommand>::type_name(),
+            <Self as Service>::Response::type_name(),
         )
         .expect("static head motion service descriptor is valid");
         let hash = compute_hash(&descriptor).expect("static head motion service hash is valid");
@@ -294,7 +286,7 @@ mod tests {
                     .wait_for_subscribers(1, Duration::from_secs(2))
                     .await
             );
-            // Unavailable observations cannot produce even a Damping reply.
+            // Unavailable observations return an explicit error even for Damping.
             wait_for_reply_state(&client, &HeadMotion::Damping, false).await;
             sensors.publish(&sample).await.unwrap();
             let active = wait_for_reply_state(&client, &HeadMotion::ZeroAngles, true)
@@ -353,8 +345,11 @@ mod tests {
                 let result = client
                     .call_with_timeout_async(request, Duration::from_millis(100))
                     .await;
-                if result.is_ok() == succeeds {
-                    return result.ok();
+                // Transport failures must never count as an application error reply.
+                if let Ok(response) = result
+                    && response.is_ok() == succeeds
+                {
+                    return response.ok();
                 }
                 sleep(Duration::from_millis(1)).await;
             }

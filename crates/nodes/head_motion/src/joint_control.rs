@@ -1,5 +1,6 @@
 //! Position commands with independent joint speed limits.
 
+use booster::MotorState;
 use color_eyre::{Result, eyre::ensure};
 use kinematics::joints::head::{HeadJoint, HeadJoints};
 use types::{joint_limits::JointLimits, motor_command::MotorCommand};
@@ -10,6 +11,21 @@ use crate::parameters::JointControlParameters;
 pub struct HeadObservation {
     pub positions: HeadJoints<f32>,
     pub velocities: HeadJoints<f32>,
+}
+
+impl From<HeadJoints<MotorState>> for HeadObservation {
+    fn from(head: HeadJoints<MotorState>) -> Self {
+        Self {
+            positions: HeadJoints {
+                yaw: head.yaw.position,
+                pitch: head.pitch.position,
+            },
+            velocities: HeadJoints {
+                yaw: head.yaw.velocity,
+                pitch: head.pitch.velocity,
+            },
+        }
+    }
 }
 
 impl HeadObservation {
