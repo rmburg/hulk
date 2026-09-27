@@ -5,8 +5,6 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::mirror::Mirror;
-
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
 pub struct LegJoints<T = f32> {
     pub hip_pitch: T,
@@ -170,19 +168,6 @@ impl Div<LegJoints<f32>> for LegJoints<f32> {
             knee: Duration::from_secs_f32((self.knee / right.knee).abs()),
             ankle_up: Duration::from_secs_f32((self.ankle_up / right.ankle_up).abs()),
             ankle_down: Duration::from_secs_f32((self.ankle_down / right.ankle_down).abs()),
-        }
-    }
-}
-
-impl Mirror for LegJoints<f32> {
-    fn mirrored(self) -> Self {
-        Self {
-            hip_pitch: self.hip_pitch,
-            hip_roll: -self.hip_roll,
-            hip_yaw: self.hip_yaw,
-            knee: self.knee,
-            ankle_up: self.ankle_up,
-            ankle_down: -self.ankle_down,
         }
     }
 }

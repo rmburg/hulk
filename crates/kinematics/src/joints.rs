@@ -11,11 +11,10 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use mirror::SwapSides;
 use serde::{Deserialize, Serialize};
 use splines::impl_Interpolate;
 
-use self::{arm::ArmJoints, body::BodyJoints, head::HeadJoints, leg::LegJoints, mirror::Mirror};
+use self::{arm::ArmJoints, body::BodyJoints, head::HeadJoints, leg::LegJoints};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ros_z::Message)]
 pub struct Joints<T = f32> {
@@ -221,30 +220,6 @@ impl Div<f32> for Joints<f32> {
 }
 
 impl_Interpolate!(f32, Joints<f32>, PI);
-
-impl Mirror for Joints<f32> {
-    fn mirrored(self) -> Self {
-        Self {
-            head: self.head.mirrored(),
-            left_arm: self.right_arm.mirrored(),
-            right_arm: self.left_arm.mirrored(),
-            left_leg: self.right_leg.mirrored(),
-            right_leg: self.left_leg.mirrored(),
-        }
-    }
-}
-
-impl SwapSides for Joints<f32> {
-    fn swapped_sides(self) -> Self {
-        Self {
-            head: self.head,
-            left_arm: self.right_arm,
-            right_arm: self.left_arm,
-            left_leg: self.right_leg,
-            right_leg: self.left_leg,
-        }
-    }
-}
 
 impl<T> From<Joints<T>> for HeadJoints<T> {
     fn from(joints: Joints<T>) -> Self {

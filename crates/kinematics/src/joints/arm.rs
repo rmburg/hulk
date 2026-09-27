@@ -7,8 +7,6 @@ use std::{
 use serde::{Deserialize, Serialize};
 use splines::impl_Interpolate;
 
-use super::mirror::Mirror;
-
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
 pub struct ArmJoints<T = f32> {
     pub shoulder_pitch: T,
@@ -120,17 +118,6 @@ impl Div<ArmJoints<f32>> for ArmJoints<f32> {
             ),
             shoulder_yaw: Duration::from_secs_f32((self.shoulder_yaw / right.shoulder_yaw).abs()),
             elbow: Duration::from_secs_f32((self.elbow / right.elbow).abs()),
-        }
-    }
-}
-
-impl Mirror for ArmJoints<f32> {
-    fn mirrored(self) -> Self {
-        Self {
-            shoulder_pitch: self.shoulder_pitch,
-            shoulder_roll: -self.shoulder_roll,
-            shoulder_yaw: -self.shoulder_yaw,
-            elbow: -self.elbow,
         }
     }
 }

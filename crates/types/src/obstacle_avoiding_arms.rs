@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use serde::{Deserialize, Serialize};
 use splines::Interpolate;
 
-use kinematics::joints::{arm::ArmJoints, mirror::Mirror};
+use kinematics::joints::arm::ArmJoints;
 
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub enum ArmCommand {
@@ -16,24 +16,6 @@ pub enum ArmCommand {
     Active {
         positions: ArmJoints,
     },
-}
-
-impl Mirror for ArmCommand {
-    fn mirrored(self) -> Self {
-        match self {
-            ArmCommand::Swing => ArmCommand::Swing,
-            ArmCommand::Activating {
-                influence,
-                positions,
-            } => ArmCommand::Activating {
-                influence,
-                positions: positions.mirrored(),
-            },
-            ArmCommand::Active { positions } => ArmCommand::Active {
-                positions: positions.mirrored(),
-            },
-        }
-    }
 }
 
 impl ArmCommand {

@@ -5,8 +5,6 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::mirror::Mirror;
-
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize, ros_z::Message)]
 pub struct HeadJoints<T> {
     pub yaw: T,
@@ -92,15 +90,6 @@ impl Div<HeadJoints<f32>> for HeadJoints<f32> {
         Self::Output {
             yaw: Duration::from_secs_f32((self.yaw / right.yaw).abs()),
             pitch: Duration::from_secs_f32((self.pitch / right.pitch).abs()),
-        }
-    }
-}
-
-impl Mirror for HeadJoints<f32> {
-    fn mirrored(self) -> Self {
-        Self {
-            yaw: -self.yaw,
-            pitch: self.pitch,
         }
     }
 }
