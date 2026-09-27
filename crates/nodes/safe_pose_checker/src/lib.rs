@@ -119,17 +119,16 @@ fn motor_states_are_safe(
     joint_position_threshold: f32,
     joint_velocity_threshold: f32,
 ) -> bool {
-    serial_motor_states
-        .into_iter()
-        .zip(*prep_mode_serial_motor_states)
-        .all(|(current_motor_state, safe_motor_state)| {
+    serial_motor_states.zip(*prep_mode_serial_motor_states).all(
+        |(current_motor_state, safe_motor_state)| {
             current_motor_state
                 .position
                 .abs_diff_eq(&safe_motor_state.position, joint_position_threshold)
                 && current_motor_state
                     .velocity
                     .abs_diff_eq(&safe_motor_state.velocity, joint_velocity_threshold)
-        })
+        },
+    )
 }
 
 fn imu_state_is_safe(

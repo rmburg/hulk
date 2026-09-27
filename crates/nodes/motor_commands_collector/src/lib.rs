@@ -3,7 +3,7 @@ use std::{future::pending, sync::Arc};
 
 use color_eyre::Result;
 
-use kinematics::joints::{Joints, head::HeadJoints};
+use kinematics::joints::{Joints, k1::HeadJoints};
 use ros_z::prelude::*;
 
 pub fn run_boxed(ctx: Arc<Context>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> {

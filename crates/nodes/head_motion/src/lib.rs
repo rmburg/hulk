@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use booster::{JointsMotorState, MotorState};
 use filtering::low_pass_filter::LowPassFilter;
-use kinematics::joints::{Joints, head::HeadJoints};
+use kinematics::joints::{Joints, k1::HeadJoints};
 use ros_z::{prelude::*, time::Time};
 use types::{
     motion_command::{HeadMotion, ImageRegion, MotionCommand},
@@ -134,7 +134,8 @@ impl HeadMotionState {
 
         let raw_positions = match motion_command.head_motion() {
             Some(HeadMotion::MoveWithVelocity { yaw, pitch }) => {
-                self.last_positions + HeadJoints { yaw, pitch } * last_cycle_duration.as_secs_f32()
+                self.last_positions
+                    + HeadJoints::from_yaw_and_pitch(yaw, pitch) * last_cycle_duration.as_secs_f32()
             }
             _ => joints_from_motion(
                 look_around_target_joints,
@@ -145,23 +146,23 @@ impl HeadMotionState {
         };
         let maximum_movement = parameters.maximum_velocity * last_cycle_duration.as_secs_f32();
 
-        let controlled_positions = HeadJoints {
-            yaw: self.last_positions.yaw
+        let controlled_positions = HeadJoints::from_yaw_and_pitch(
+            self.last_positions.yaw
                 + (raw_positions.yaw - self.last_positions.yaw)
                     .clamp(-maximum_movement.yaw, maximum_movement.yaw),
-            pitch: self.last_positions.pitch
+            self.last_positions.pitch
                 + (raw_positions.pitch - self.last_positions.pitch)
                     .clamp(-maximum_movement.pitch, maximum_movement.pitch),
-        };
+        );
 
-        let clamped_positions = HeadJoints {
-            pitch: controlled_positions
+        let clamped_positions = HeadJoints::from_yaw_and_pitch(
+            controlled_positions
                 .pitch
                 .clamp(parameters.minimum_pitch, parameters.maximum_pitch),
-            yaw: controlled_positions
+            controlled_positions
                 .yaw
                 .clamp(parameters.minimum_yaw, parameters.maximum_yaw),
-        };
+        );
 
         self.last_positions = clamped_positions;
         clamped_positions
@@ -177,14 +178,8 @@ fn joints_from_motion(
     match motion_command.head_motion() {
         Some(HeadMotion::Center {
             image_region_target: ImageRegion::Top,
-        }) => HeadJoints {
-            yaw: 0.0,
-            pitch: 0.4,
-        },
-        Some(HeadMotion::Center { .. }) => HeadJoints {
-            yaw: 0.0,
-            pitch: 0.4,
-        },
+        }) => HeadJoints::from_yaw_and_pitch(0.0, 0.4),
+        Some(HeadMotion::Center { .. }) => HeadJoints::from_yaw_and_pitch(0.0, 0.4),
         Some(HeadMotion::LookAt { .. }) | Some(HeadMotion::LookLeftAndRightOf { .. }) => look_at,
         Some(HeadMotion::Unstiff) => motor_states.positions().head,
         Some(HeadMotion::LookAround) | Some(HeadMotion::SearchForLostBall) => {
@@ -224,21 +219,12 @@ mod tests {
             },
         );
 
-        assert_eq!(
-            head_joints,
-            HeadJoints {
-                yaw: 0.1,
-                pitch: 0.3,
-            }
-        );
+        assert_eq!(head_joints, HeadJoints::from_yaw_and_pitch(0.1, 0.3));
     }
 
     #[test]
     fn unstiff_uses_measured_head_positions() {
-        let measured_head = HeadJoints {
-            yaw: 0.3,
-            pitch: -0.2,
-        };
+        let measured_head = HeadJoints::from_yaw_and_pitch(0.3, -0.2);
         let motor_states = motor_states_with_head(measured_head);
         let mut state = HeadMotionState::new();
 
@@ -276,10 +262,7 @@ mod tests {
     fn injected_head_joints_update_last_positions() {
         let mut injected_parameters = test_parameters();
         injected_parameters.maximum_velocity = HeadJoints::fill(0.0);
-        injected_parameters.injected_head_joints = Some(HeadJoints {
-            yaw: 1.0,
-            pitch: -0.5,
-        });
+        injected_parameters.injected_head_joints = Some(HeadJoints::from_yaw_and_pitch(1.0, -0.5));
         let mut normal_parameters = test_parameters();
         normal_parameters.maximum_velocity = HeadJoints::fill(0.0);
         let mut state = HeadMotionState::new();
@@ -294,10 +277,7 @@ mod tests {
         );
         let after_injection = state.update(
             &normal_parameters,
-            HeadJoints {
-                yaw: 0.7,
-                pitch: 0.2,
-            },
+            HeadJoints::from_yaw_and_pitch(0.7, 0.2),
             HeadJoints::default(),
             &Joints::default(),
             Duration::from_secs(1),
@@ -313,10 +293,7 @@ mod tests {
         HeadMotionParameters {
             maximum_pitch: 1.0,
             minimum_pitch: -1.0,
-            maximum_velocity: HeadJoints {
-                yaw: 100.0,
-                pitch: 100.0,
-            },
+            maximum_velocity: HeadJoints::from_yaw_and_pitch(100.0, 100.0),
             maximum_defender_velocity: HeadJoints::default(),
             maximum_yaw: 1.0,
             minimum_yaw: -1.0,
@@ -325,7 +302,7 @@ mod tests {
     }
 
     fn motor_states_with_head(head: HeadJoints<f32>) -> Joints<MotorState> {
-        let mut motor_states = Joints::fill(MotorState::default());
+        let mut motor_states = Joints::<MotorState>::default();
         motor_states.head.yaw.position = head.yaw;
         motor_states.head.pitch.position = head.pitch;
         motor_states

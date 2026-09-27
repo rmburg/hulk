@@ -1,5 +1,5 @@
 use coordinate_systems::{Field, Ground, Robot};
-use kinematics::{forward::left_sole_to_robot, joints::leg::LegJoints};
+use kinematics::{forward::left_sole_to_robot, joints::k1::LegJoints};
 use linear_algebra::{IntoTransform, Isometry3, Orientation3};
 use localization_factrs::{InitialState, OptimizationResult};
 use projection::camera_matrix::CameraMatrix;
@@ -96,7 +96,9 @@ fn constrain_localization_to_ground(
 }
 
 fn robot_height() -> f32 {
-    -left_sole_to_robot(&LegJoints::default()).translation().z()
+    -left_sole_to_robot(LegJoints::default().as_ref())
+        .translation()
+        .z()
 }
 
 #[cfg(test)]

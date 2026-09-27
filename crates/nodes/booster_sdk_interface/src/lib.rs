@@ -15,7 +15,7 @@ use booster::{
     walking::{WalkingParameters, step_from_motion_command},
 };
 use color_eyre::{Result, eyre::WrapErr};
-use kinematics::joints::head::HeadJoints;
+use kinematics::joints::k1::HeadJoints;
 use retry_worker::{RetryCommand, run_retrying_rpc_worker};
 use ros_z::prelude::*;
 use serde::{Deserialize, Serialize};

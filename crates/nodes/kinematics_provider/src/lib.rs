@@ -58,54 +58,57 @@ async fn run(ctx: Arc<Context>) -> Result<()> {
 
 fn compute_robot_kinematics(motor_positions: &Joints) -> RobotKinematics {
     // head
-    let neck_to_robot = neck_to_robot(&motor_positions.head);
-    let head_to_robot = neck_to_robot * head_to_neck(&motor_positions.head);
+    let neck_to_robot = neck_to_robot(motor_positions.head.as_ref());
+    let head_to_robot = neck_to_robot * head_to_neck(motor_positions.head.as_ref());
     // torso
     let torso_to_robot = Isometry3::from(RobotDimensions::ROBOT_TO_TORSO);
     // left arm
-    let left_inner_shoulder_to_robot = left_inner_shoulder_to_robot(&motor_positions.left_arm);
+    let left_inner_shoulder_to_robot =
+        left_inner_shoulder_to_robot(motor_positions.left_arm.as_ref());
     let left_outer_shoulder_to_robot = left_inner_shoulder_to_robot
-        * left_outer_shoulder_to_left_inner_shoulder(&motor_positions.left_arm);
+        * left_outer_shoulder_to_left_inner_shoulder(motor_positions.left_arm.as_ref());
     let left_upper_arm_to_robot = left_outer_shoulder_to_robot
-        * left_upper_arm_to_left_outer_shoulder(&motor_positions.left_arm);
+        * left_upper_arm_to_left_outer_shoulder(motor_positions.left_arm.as_ref());
     let left_forearm_to_robot =
-        left_upper_arm_to_robot * left_forearm_to_left_upper_arm(&motor_positions.left_arm);
+        left_upper_arm_to_robot * left_forearm_to_left_upper_arm(motor_positions.left_arm.as_ref());
 
     // right arm
-    let right_inner_shoulder_to_robot = right_inner_shoulder_to_robot(&motor_positions.right_arm);
+    let right_inner_shoulder_to_robot =
+        right_inner_shoulder_to_robot(motor_positions.right_arm.as_ref());
     let right_outer_shoulder_to_robot = right_inner_shoulder_to_robot
-        * right_outer_shoulder_to_right_inner_shoulder(&motor_positions.right_arm);
+        * right_outer_shoulder_to_right_inner_shoulder(motor_positions.right_arm.as_ref());
     let right_upper_arm_to_robot = right_outer_shoulder_to_robot
-        * right_upper_arm_to_right_outer_shoulder(&motor_positions.right_arm);
+        * right_upper_arm_to_right_outer_shoulder(motor_positions.right_arm.as_ref());
 
-    let right_forearm_to_robot =
-        right_upper_arm_to_robot * right_forearm_to_right_upper_arm(&motor_positions.right_arm);
+    let right_forearm_to_robot = right_upper_arm_to_robot
+        * right_forearm_to_right_upper_arm(motor_positions.right_arm.as_ref());
 
     // left leg
-    let left_pelvis_to_robot = left_pelvis_to_robot(&motor_positions.left_leg);
+    let left_pelvis_to_robot = left_pelvis_to_robot(motor_positions.left_leg.as_ref());
     let left_hip_to_robot =
-        left_pelvis_to_robot * left_hip_to_left_pelvis(&motor_positions.left_leg);
-    let left_thigh_to_robot = left_hip_to_robot * left_thigh_to_left_hip(&motor_positions.left_leg);
+        left_pelvis_to_robot * left_hip_to_left_pelvis(motor_positions.left_leg.as_ref());
+    let left_thigh_to_robot =
+        left_hip_to_robot * left_thigh_to_left_hip(motor_positions.left_leg.as_ref());
     let left_tibia_to_robot =
-        left_thigh_to_robot * left_tibia_to_left_thigh(&motor_positions.left_leg);
+        left_thigh_to_robot * left_tibia_to_left_thigh(motor_positions.left_leg.as_ref());
     let left_ankle_to_robot =
-        left_tibia_to_robot * left_ankle_to_left_tibia(&motor_positions.left_leg);
+        left_tibia_to_robot * left_ankle_to_left_tibia(motor_positions.left_leg.as_ref());
     let left_foot_to_robot =
-        left_ankle_to_robot * left_foot_to_left_ankle(&motor_positions.left_leg);
+        left_ankle_to_robot * left_foot_to_left_ankle(motor_positions.left_leg.as_ref());
     let left_sole_to_robot =
         left_foot_to_robot * Isometry3::from(RobotDimensions::LEFT_FOOT_TO_LEFT_SOLE);
     // right leg
-    let right_pelvis_to_robot = right_pelvis_to_robot(&motor_positions.right_leg);
+    let right_pelvis_to_robot = right_pelvis_to_robot(motor_positions.right_leg.as_ref());
     let right_hip_to_robot =
-        right_pelvis_to_robot * right_hip_to_right_pelvis(&motor_positions.right_leg);
+        right_pelvis_to_robot * right_hip_to_right_pelvis(motor_positions.right_leg.as_ref());
     let right_thigh_to_robot =
-        right_hip_to_robot * right_thigh_to_right_hip(&motor_positions.right_leg);
+        right_hip_to_robot * right_thigh_to_right_hip(motor_positions.right_leg.as_ref());
     let right_tibia_to_robot =
-        right_thigh_to_robot * right_tibia_to_right_thigh(&motor_positions.right_leg);
+        right_thigh_to_robot * right_tibia_to_right_thigh(motor_positions.right_leg.as_ref());
     let right_ankle_to_robot =
-        right_tibia_to_robot * right_ankle_to_right_tibia(&motor_positions.right_leg);
+        right_tibia_to_robot * right_ankle_to_right_tibia(motor_positions.right_leg.as_ref());
     let right_foot_to_robot =
-        right_ankle_to_robot * right_foot_to_right_ankle(&motor_positions.right_leg);
+        right_ankle_to_robot * right_foot_to_right_ankle(motor_positions.right_leg.as_ref());
     let right_sole_to_robot =
         right_foot_to_robot * Isometry3::from(RobotDimensions::RIGHT_FOOT_TO_RIGHT_SOLE);
 

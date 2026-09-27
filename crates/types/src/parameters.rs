@@ -1,7 +1,7 @@
 use std::{ops::Range, path::PathBuf, time::Duration};
 
 use hsl_network_messages::PlayerNumber;
-use kinematics::joints::{Joints, head::HeadJoints};
+use kinematics::joints::{Joints, k1::HeadJoints};
 use ros_z::Message;
 use serde::{Deserialize, Serialize};
 

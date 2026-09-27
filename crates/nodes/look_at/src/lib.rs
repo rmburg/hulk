@@ -7,7 +7,7 @@ use booster::MotorState;
 use coordinate_systems::{Camera, Ground, Robot};
 use kinematics::{
     forward::{head_to_neck, neck_to_robot},
-    joints::{Joints, head::HeadJoints},
+    joints::{Joints, k1::HeadJoints},
 };
 use linear_algebra::{Isometry3, Point2, distance, point, vector};
 use projection::camera_matrix::CameraMatrix;
@@ -146,8 +146,8 @@ impl LookAtState {
             _ => return measured_head_angles,
         };
 
-        let zero_head_to_robot =
-            neck_to_robot(&HeadJoints::default()) * head_to_neck(&HeadJoints::default());
+        let zero_head_to_robot = neck_to_robot(HeadJoints::default().as_ref())
+            * head_to_neck(HeadJoints::default().as_ref());
         let robot_to_zero_head = zero_head_to_robot.inverse();
         let ground_to_zero_head = robot_to_zero_head * ground_to_robot;
         let image_region_target = if with_camera {
@@ -210,20 +210,19 @@ fn look_at_with_camera(
     let yaw = f32::atan2(-target_in_camera.x(), target_in_camera.z()) + yaw_offset;
     let pitch = -f32::atan2(-target_in_camera.y(), target_in_camera.z()) - pitch_offset;
 
-    HeadJoints { yaw, pitch }
+    HeadJoints::from_yaw_and_pitch(yaw, pitch)
 }
 
 fn measured_head_angles(serial_motor_states: &Joints<MotorState>) -> HeadJoints<f32> {
-    HeadJoints {
-        yaw: serial_motor_states.head.yaw.position,
-        pitch: serial_motor_states.head.pitch.position,
-    }
+    serial_motor_states
+        .head
+        .map(|motor_state| motor_state.position)
 }
 
 #[cfg(test)]
 mod tests {
     use coordinate_systems::{Camera, Ground, Head, Robot};
-    use kinematics::joints::head::HeadJoints;
+    use kinematics::joints::k1::HeadJoints;
     use linear_algebra::{Isometry3, nalgebra, point};
     use projection::camera_matrix::CameraMatrix;
     use types::{motion_command::ImageRegion, parameters::ImageRegionParameters};
@@ -232,16 +231,13 @@ mod tests {
 
     #[test]
     fn measured_head_angles_read_head_motor_positions_directly() {
-        let mut motor_states = Joints::fill(MotorState::default());
+        let mut motor_states = Joints::<MotorState>::default();
         motor_states.head.yaw.position = 0.3;
         motor_states.head.pitch.position = -0.2;
 
         assert_eq!(
             measured_head_angles(&motor_states),
-            HeadJoints {
-                yaw: 0.3,
-                pitch: -0.2,
-            }
+            HeadJoints::from_yaw_and_pitch(0.3, -0.2)
         );
     }
 
@@ -261,7 +257,7 @@ mod tests {
             top: point![0.5, 0.5],
         };
 
-        let HeadJoints { yaw, pitch } = look_at_with_camera(
+        let head_joints = look_at_with_camera(
             point![0.0, 0.0],
             Isometry3::<Ground, Camera>::identity(),
             &camera_matrix,
@@ -269,7 +265,7 @@ mod tests {
             image_region_parameters,
         );
 
-        assert!(yaw.abs() < f32::EPSILON);
-        assert!(pitch.abs() < f32::EPSILON);
+        assert!(head_joints.yaw.abs() < f32::EPSILON);
+        assert!(head_joints.pitch.abs() < f32::EPSILON);
     }
 }

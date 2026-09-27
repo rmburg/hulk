@@ -1,4 +1,4 @@
-use color_eyre::eyre::{Result, bail};
+use color_eyre::eyre::{OptionExt, Result};
 use coordinate_systems::{Ground, Robot};
 use kinematics::joints::Joints;
 use linear_algebra::{Isometry2, Vector3, vector};
@@ -104,27 +104,19 @@ impl LowState {
 
 impl LowState {
     pub fn serial_motor_states(&self) -> Result<Joints<MotorState>> {
-        if self.motor_state_serial.len() == 22 {
-            Ok(self
-                .motor_state_serial
-                .iter()
-                .copied()
-                .collect::<Joints<MotorState>>())
-        } else {
-            bail!("failed to construct motor states")
-        }
+        self.motor_state_serial
+            .as_array()
+            .ok_or_eyre("failed to construct motor states")
+            .copied()
+            .map(Joints::from_array)
     }
 
     pub fn parallel_motor_states(&self) -> Result<Joints<MotorState>> {
-        if self.motor_state_parallel.len() == 22 {
-            Ok(self
-                .motor_state_parallel
-                .iter()
-                .copied()
-                .collect::<Joints<MotorState>>())
-        } else {
-            bail!("failed to construct motor states")
-        }
+        self.motor_state_parallel
+            .as_array()
+            .ok_or_eyre("failed to construct motor states")
+            .copied()
+            .map(Joints::from_array)
     }
 }
 
@@ -237,27 +229,19 @@ pub trait JointsMotorState {
 
 impl JointsMotorState for Joints<MotorState> {
     fn positions(&self) -> Joints {
-        self.into_iter()
-            .map(|motor_state| motor_state.position)
-            .collect::<Joints<f32>>()
+        self.map(|motor_state| motor_state.position)
     }
 
     fn velocities(&self) -> Joints {
-        self.into_iter()
-            .map(|motor_state| motor_state.velocity)
-            .collect::<Joints<f32>>()
+        self.map(|motor_state| motor_state.velocity)
     }
 
     fn accelerations(&self) -> Joints {
-        self.into_iter()
-            .map(|motor_state| motor_state.acceleration)
-            .collect::<Joints<f32>>()
+        self.map(|motor_state| motor_state.acceleration)
     }
 
     fn torques(&self) -> Joints {
-        self.into_iter()
-            .map(|motor_state| motor_state.torque)
-            .collect::<Joints<f32>>()
+        self.map(|motor_state| motor_state.torque)
     }
 }
 
@@ -289,7 +273,6 @@ impl LowCommand {
         LowCommand {
             command_type,
             motor_commands: joint_positions
-                .into_iter()
                 .zip(motor_command_parameters.proportional_coefficients)
                 .zip(motor_command_parameters.derivative_coefficients)
                 .map(|((joint_position, kp), kd)| MotorCommand {
@@ -301,7 +284,8 @@ impl LowCommand {
                     kd,
                     weight: motor_command_parameters.weight,
                 })
-                .collect(),
+                .into_array()
+                .to_vec(),
         }
     }
 }

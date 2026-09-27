@@ -2,7 +2,7 @@ use std::{boxed::Box, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use color_eyre::Result;
 
-use kinematics::joints::head::HeadJoints;
+use kinematics::joints::k1::HeadJoints;
 use ros_z::{prelude::*, time::Time};
 use types::{
     field_dimensions::GlobalFieldSide,
@@ -385,9 +385,6 @@ mod tests {
     }
 
     fn head_joints(value: f32) -> HeadJoints<f32> {
-        HeadJoints {
-            yaw: value,
-            pitch: value + 0.5,
-        }
+        HeadJoints::from_yaw_and_pitch(value, value + 0.5)
     }
 }

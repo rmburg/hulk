@@ -7,18 +7,18 @@ use coordinate_systems::{
 use linear_algebra::{Isometry3, Orientation3, Vector3};
 
 use crate::{
-    joints::{arm::ArmJoints, head::HeadJoints, leg::LegJoints},
+    joints::k1::{BorrowedArmJoints, BorrowedHeadJoints, BorrowedLegJoints},
     robot_dimensions::RobotDimensions,
 };
 
-pub fn neck_to_robot(angles: &HeadJoints<f32>) -> Isometry3<Neck, Robot> {
+pub fn neck_to_robot(angles: BorrowedHeadJoints<f32>) -> Isometry3<Neck, Robot> {
     Isometry3::from_parts(
         RobotDimensions::ROBOT_TO_NECK,
         Orientation3::new(Vector3::z_axis() * angles.yaw),
     )
 }
 
-pub fn head_to_neck(angles: &HeadJoints<f32>) -> Isometry3<Head, Neck> {
+pub fn head_to_neck(angles: BorrowedHeadJoints<f32>) -> Isometry3<Head, Neck> {
     Isometry3::from_parts(
         RobotDimensions::NECK_TO_HEAD,
         Orientation3::new(Vector3::y_axis() * angles.pitch),
@@ -27,7 +27,7 @@ pub fn head_to_neck(angles: &HeadJoints<f32>) -> Isometry3<Head, Neck> {
 
 // left arm
 pub fn left_inner_shoulder_to_robot(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<LeftInnerShoulder, Robot> {
     Isometry3::from_parts(
         RobotDimensions::ROBOT_TO_LEFT_INNER_SHOULDER,
@@ -36,7 +36,7 @@ pub fn left_inner_shoulder_to_robot(
 }
 
 pub fn left_outer_shoulder_to_left_inner_shoulder(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<LeftOuterShoulder, LeftInnerShoulder> {
     Isometry3::from_parts(
         RobotDimensions::LEFT_INNER_SHOULDER_TO_LEFT_OUTER_SHOULDER,
@@ -45,7 +45,7 @@ pub fn left_outer_shoulder_to_left_inner_shoulder(
 }
 
 pub fn left_upper_arm_to_left_outer_shoulder(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<LeftUpperArm, LeftOuterShoulder> {
     Isometry3::from_parts(
         RobotDimensions::LEFT_OUTER_SHOULDER_TO_LEFT_UPPER_ARM,
@@ -54,7 +54,7 @@ pub fn left_upper_arm_to_left_outer_shoulder(
 }
 
 pub fn left_forearm_to_left_upper_arm(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<LeftForearm, LeftUpperArm> {
     Isometry3::from_parts(
         RobotDimensions::LEFT_UPPER_ARM_TO_LEFT_FOREARM,
@@ -64,7 +64,7 @@ pub fn left_forearm_to_left_upper_arm(
 
 // right arm
 pub fn right_inner_shoulder_to_robot(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<RightInnerShoulder, Robot> {
     Isometry3::from_parts(
         RobotDimensions::ROBOT_TO_RIGHT_INNER_SHOULDER,
@@ -73,7 +73,7 @@ pub fn right_inner_shoulder_to_robot(
 }
 
 pub fn right_outer_shoulder_to_right_inner_shoulder(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<RightOuterShoulder, RightInnerShoulder> {
     Isometry3::from_parts(
         RobotDimensions::RIGHT_INNER_SHOULDER_TO_RIGHT_OUTER_SHOULDER,
@@ -82,7 +82,7 @@ pub fn right_outer_shoulder_to_right_inner_shoulder(
 }
 
 pub fn right_upper_arm_to_right_outer_shoulder(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<RightUpperArm, RightOuterShoulder> {
     Isometry3::from_parts(
         RobotDimensions::RIGHT_OUTER_SHOULDER_TO_RIGHT_UPPER_ARM,
@@ -91,7 +91,7 @@ pub fn right_upper_arm_to_right_outer_shoulder(
 }
 
 pub fn right_forearm_to_right_upper_arm(
-    angles: &ArmJoints<f32>,
+    angles: BorrowedArmJoints<f32>,
 ) -> Isometry3<RightForearm, RightUpperArm> {
     Isometry3::from_parts(
         RobotDimensions::RIGHT_UPPER_ARM_TO_RIGHT_FOREARM,
@@ -99,46 +99,46 @@ pub fn right_forearm_to_right_upper_arm(
     )
 }
 // left leg
-pub fn left_pelvis_to_robot(angles: &LegJoints<f32>) -> Isometry3<LeftPelvis, Robot> {
+pub fn left_pelvis_to_robot(angles: BorrowedLegJoints<f32>) -> Isometry3<LeftPelvis, Robot> {
     Isometry3::from_parts(
         RobotDimensions::ROBOT_TO_LEFT_PELVIS,
         Orientation3::new(Vector3::y_axis() * angles.hip_pitch),
     )
 }
 
-pub fn left_hip_to_left_pelvis(angles: &LegJoints<f32>) -> Isometry3<LeftHip, LeftPelvis> {
+pub fn left_hip_to_left_pelvis(angles: BorrowedLegJoints<f32>) -> Isometry3<LeftHip, LeftPelvis> {
     Isometry3::from_parts(
         RobotDimensions::LEFT_PELVIS_TO_LEFT_HIP,
         Orientation3::new(Vector3::x_axis() * angles.hip_roll),
     )
 }
 
-pub fn left_thigh_to_left_hip(angles: &LegJoints<f32>) -> Isometry3<LeftThigh, LeftHip> {
+pub fn left_thigh_to_left_hip(angles: BorrowedLegJoints<f32>) -> Isometry3<LeftThigh, LeftHip> {
     Isometry3::from_parts(
         RobotDimensions::LEFT_HIP_TO_LEFT_THIGH,
         Orientation3::new(Vector3::z_axis() * angles.hip_yaw),
     )
 }
 
-pub fn left_tibia_to_left_thigh(angles: &LegJoints<f32>) -> Isometry3<LeftTibia, LeftThigh> {
+pub fn left_tibia_to_left_thigh(angles: BorrowedLegJoints<f32>) -> Isometry3<LeftTibia, LeftThigh> {
     Isometry3::from_parts(
         RobotDimensions::LEFT_THIGH_TO_LEFT_TIBIA,
         Orientation3::new(Vector3::y_axis() * angles.knee),
     )
 }
 
-pub fn left_ankle_to_left_tibia(angles: &LegJoints<f32>) -> Isometry3<LeftAnkle, LeftTibia> {
+pub fn left_ankle_to_left_tibia(angles: BorrowedLegJoints<f32>) -> Isometry3<LeftAnkle, LeftTibia> {
     Isometry3::from_parts(
         RobotDimensions::LEFT_TIBIA_TO_LEFT_ANKLE,
         Orientation3::new(Vector3::y_axis() * angles.ankle_up),
     )
 }
 
-pub fn left_foot_to_left_ankle(angles: &LegJoints<f32>) -> Isometry3<LeftFoot, LeftAnkle> {
+pub fn left_foot_to_left_ankle(angles: BorrowedLegJoints<f32>) -> Isometry3<LeftFoot, LeftAnkle> {
     Isometry3::from_rotation(Vector3::x_axis() * angles.ankle_down)
 }
 
-pub fn left_sole_to_robot(angles: &LegJoints<f32>) -> Isometry3<LeftSole, Robot> {
+pub fn left_sole_to_robot(angles: BorrowedLegJoints<f32>) -> Isometry3<LeftSole, Robot> {
     left_pelvis_to_robot(angles)
         * left_hip_to_left_pelvis(angles)
         * left_thigh_to_left_hip(angles)
@@ -149,46 +149,54 @@ pub fn left_sole_to_robot(angles: &LegJoints<f32>) -> Isometry3<LeftSole, Robot>
 }
 
 // right leg
-pub fn right_pelvis_to_robot(angles: &LegJoints<f32>) -> Isometry3<RightPelvis, Robot> {
+pub fn right_pelvis_to_robot(angles: BorrowedLegJoints<f32>) -> Isometry3<RightPelvis, Robot> {
     Isometry3::from_parts(
         RobotDimensions::ROBOT_TO_RIGHT_PELVIS,
         Orientation3::new(Vector3::y_axis() * angles.hip_pitch),
     )
 }
 
-pub fn right_hip_to_right_pelvis(angles: &LegJoints<f32>) -> Isometry3<RightHip, RightPelvis> {
+pub fn right_hip_to_right_pelvis(
+    angles: BorrowedLegJoints<f32>,
+) -> Isometry3<RightHip, RightPelvis> {
     Isometry3::from_parts(
         RobotDimensions::RIGHT_PELVIS_TO_RIGHT_HIP,
         Orientation3::new(Vector3::x_axis() * angles.hip_roll),
     )
 }
 
-pub fn right_thigh_to_right_hip(angles: &LegJoints<f32>) -> Isometry3<RightThigh, RightHip> {
+pub fn right_thigh_to_right_hip(angles: BorrowedLegJoints<f32>) -> Isometry3<RightThigh, RightHip> {
     Isometry3::from_parts(
         RobotDimensions::RIGHT_HIP_TO_RIGHT_THIGH,
         Orientation3::new(Vector3::z_axis() * angles.hip_yaw),
     )
 }
 
-pub fn right_tibia_to_right_thigh(angles: &LegJoints<f32>) -> Isometry3<RightTibia, RightThigh> {
+pub fn right_tibia_to_right_thigh(
+    angles: BorrowedLegJoints<f32>,
+) -> Isometry3<RightTibia, RightThigh> {
     Isometry3::from_parts(
         RobotDimensions::RIGHT_THIGH_TO_RIGHT_TIBIA,
         Orientation3::new(Vector3::y_axis() * angles.knee),
     )
 }
 
-pub fn right_ankle_to_right_tibia(angles: &LegJoints<f32>) -> Isometry3<RightAnkle, RightTibia> {
+pub fn right_ankle_to_right_tibia(
+    angles: BorrowedLegJoints<f32>,
+) -> Isometry3<RightAnkle, RightTibia> {
     Isometry3::from_parts(
         RobotDimensions::RIGHT_TIBIA_TO_RIGHT_ANKLE,
         Orientation3::new(Vector3::y_axis() * angles.ankle_up),
     )
 }
 
-pub fn right_foot_to_right_ankle(angles: &LegJoints<f32>) -> Isometry3<RightFoot, RightAnkle> {
+pub fn right_foot_to_right_ankle(
+    angles: BorrowedLegJoints<f32>,
+) -> Isometry3<RightFoot, RightAnkle> {
     Isometry3::from_rotation(Vector3::x_axis() * angles.ankle_down)
 }
 
-pub fn right_sole_to_robot(angles: &LegJoints<f32>) -> Isometry3<RightSole, Robot> {
+pub fn right_sole_to_robot(angles: BorrowedLegJoints<f32>) -> Isometry3<RightSole, Robot> {
     right_pelvis_to_robot(angles)
         * right_hip_to_right_pelvis(angles)
         * right_thigh_to_right_hip(angles)

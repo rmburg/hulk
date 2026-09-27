@@ -6209,6 +6209,7 @@ dependencies = [
 name = "kinematics"
 version = "0.1.0"
 dependencies = [
+ "arrayref",
  "coordinate_systems",
  "linear_algebra",
  "ros-z",

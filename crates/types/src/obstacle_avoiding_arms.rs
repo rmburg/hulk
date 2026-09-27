@@ -3,7 +3,7 @@ use std::f32::consts::FRAC_PI_2;
 use serde::{Deserialize, Serialize};
 use splines::Interpolate;
 
-use kinematics::joints::arm::ArmJoints;
+use kinematics::joints::k1::ArmJoints;
 
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub enum ArmCommand {
