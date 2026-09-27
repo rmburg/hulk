@@ -239,6 +239,7 @@ fn deserialize_shape_value(
     reader: &mut CdrReader<LittleEndian>,
 ) -> Result<DynamicValue, DynamicError> {
     match shape {
+        TypeDef::Zst => Ok(DynamicValue::Zst),
         TypeDef::Primitive(PrimitiveTypeDef::Bool) => Ok(DynamicValue::Bool(
             reader.read_bool().map_err(DynamicError::deserialization)?,
         )),

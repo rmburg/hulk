@@ -308,6 +308,8 @@ pub enum TypeDef {
     Primitive(PrimitiveTypeDef),
     /// A UTF-8 string.
     String,
+    /// A zero-sized type.
+    Zst,
     /// A reference to a named definition.
     Named(TypeName),
     /// An optional value.
@@ -335,7 +337,7 @@ impl TypeDef {
         reachable: &mut BTreeSet<TypeName>,
     ) -> Result<(), SchemaError> {
         match self {
-            Self::Primitive(_) | Self::String => Ok(()),
+            Self::Primitive(_) | Self::String | Self::Zst => Ok(()),
             Self::Named(name) => {
                 let Some(definition) = definitions.get(name) else {
                     return Err(SchemaError::MissingDefinition(name.clone()));

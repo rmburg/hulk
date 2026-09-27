@@ -15,6 +15,7 @@ use std::collections::BTreeSet;
 /// Runtime representation of any supported dynamic value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DynamicValue {
+    Zst,
     // Primitives
     Bool(bool),
     Int8(i8),
@@ -487,6 +488,7 @@ pub(crate) fn default_for_shape_with_active(
     active: &mut BTreeSet<TypeName>,
 ) -> Result<DynamicValue, DynamicError> {
     match shape {
+        TypeDef::Zst => Ok(DynamicValue::Zst),
         TypeDef::Primitive(PrimitiveTypeDef::Bool) => Ok(DynamicValue::Bool(false)),
         TypeDef::Primitive(PrimitiveTypeDef::I8) => Ok(DynamicValue::Int8(0)),
         TypeDef::Primitive(PrimitiveTypeDef::U8) => Ok(DynamicValue::Uint8(0)),

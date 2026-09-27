@@ -91,6 +91,7 @@ impl JsonEncode for TypeDef {
     fn write_json(&self, out: &mut String) -> Result<(), SchemaError> {
         out.push('{');
         match self {
+            Self::Zst => {}
             Self::Primitive(primitive) => {
                 write_json_string("kind", out);
                 out.push(':');

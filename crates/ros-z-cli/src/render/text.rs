@@ -454,6 +454,7 @@ fn schema_field_kind_name(kind: SchemaFieldKindView) -> &'static str {
         SchemaFieldKindView::Array => "array",
         SchemaFieldKindView::Sequence => "sequence",
         SchemaFieldKindView::Map => "map",
+        SchemaFieldKindView::Zst => "zst",
     }
 }
 

@@ -111,7 +111,7 @@ fn shape_uses_extended_types(shape: &TypeDef, schema: &SchemaBundle) -> bool {
         ),
         TypeDef::Optional(_) | TypeDef::Map { .. } => true,
         TypeDef::Sequence { element, .. } => shape_uses_extended_types(element, schema),
-        TypeDef::Primitive(_) | TypeDef::String => false,
+        TypeDef::Primitive(_) | TypeDef::String | TypeDef::Zst => false,
     }
 }
 

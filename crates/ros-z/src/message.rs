@@ -6,7 +6,7 @@ use ros_z_schema::{
 use serde::{Serialize, de::DeserializeOwned};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
-use std::marker::PhantomData;
+use std::marker::{PhantomData, Send, Sync};
 use std::net::SocketAddr;
 use std::ops::{Range, RangeInclusive};
 use std::path::PathBuf;
@@ -646,6 +646,20 @@ impl Message for PathBuf {
 impl MessageSchema for PathBuf {
     fn build_schema(_builder: &mut SchemaBuilder) -> Result<TypeDef, SchemaError> {
         Ok(TypeDef::String)
+    }
+}
+
+impl<T: Sync + Send + 'static> Message for PhantomData<T> {
+    type Codec = SerdeCdrCodec<Self>;
+
+    fn type_name() -> String {
+        "PhantomData".to_string()
+    }
+}
+
+impl<T> MessageSchema for PhantomData<T> {
+    fn build_schema(_builder: &mut SchemaBuilder) -> Result<TypeDef, SchemaError> {
+        Ok(TypeDef::Zst)
     }
 }
 

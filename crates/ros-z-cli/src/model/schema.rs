@@ -42,6 +42,7 @@ pub enum SchemaFieldKindView {
     Array,
     Sequence,
     Map,
+    Zst,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -139,7 +140,7 @@ fn flatten_nested_fields(
             flatten_nested_fields(prefix, key.as_ref(), definitions, views, visiting);
             flatten_nested_fields(prefix, value.as_ref(), definitions, views, visiting);
         }
-        TypeDef::Primitive(_) | TypeDef::String => {}
+        TypeDef::Primitive(_) | TypeDef::String | TypeDef::Zst => {}
     }
 }
 
@@ -270,7 +271,7 @@ fn collect_nested_enum_variant_field_views(
                 visiting,
             );
         }
-        TypeDef::Primitive(_) | TypeDef::String => {}
+        TypeDef::Primitive(_) | TypeDef::String | TypeDef::Zst => {}
     }
 }
 
@@ -301,12 +302,13 @@ fn enum_schema<'a>(
         }
         TypeDef::Map { key, value } => enum_schema(key.as_ref(), definitions)
             .or_else(|| enum_schema(value.as_ref(), definitions)),
-        TypeDef::Primitive(_) | TypeDef::String => None,
+        TypeDef::Primitive(_) | TypeDef::String | TypeDef::Zst => None,
     }
 }
 
 fn describe_shape(shape: &TypeDef, definitions: &TypeDefinitions) -> String {
     match shape {
+        TypeDef::Zst => "zst".to_string(),
         TypeDef::Primitive(primitive) => describe_primitive(*primitive).to_string(),
         TypeDef::String => "string".to_string(),
         TypeDef::Named(name) => match definitions.get(name) {
@@ -355,6 +357,7 @@ fn describe_primitive(primitive: PrimitiveTypeDef) -> &'static str {
 
 fn shape_kind(shape: &TypeDef, definitions: &TypeDefinitions) -> SchemaFieldKindView {
     match shape {
+        TypeDef::Zst => SchemaFieldKindView::Zst,
         TypeDef::Primitive(_) => SchemaFieldKindView::Primitive,
         TypeDef::String => SchemaFieldKindView::String,
         TypeDef::Named(name) => match definitions.get(name) {
