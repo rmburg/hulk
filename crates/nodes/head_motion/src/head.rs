@@ -73,26 +73,18 @@ pub struct HeadController {
 }
 
 impl HeadController {
-    /// Discard measurements when the input adapter cannot decode a LowState sample.
-    pub fn invalidate_observation(&mut self) {
-        self.observation = None;
-    }
-
-    /// Receive every LowState-derived head observation without generating commands.
-    /// Invalid observations invalidate the cache instead of retaining older input.
-    pub fn observe(&mut self, observation: HeadObservation, now: Time) -> Result<()> {
-        let rollback = self
+    pub fn observe(&mut self, observation: HeadObservation, source_time: Time) -> Result<()> {
+        observation.validate()?;
+        if self
             .observation
             .as_ref()
-            .is_some_and(|previous| now < previous.time);
-        self.observation = None;
-        observation.validate()?;
-        if rollback {
+            .is_some_and(|previous| source_time < previous.time)
+        {
             self.reset_motion();
         }
         self.observation = Some(TimedObservation {
             value: observation,
-            time: now,
+            time: source_time,
         });
         Ok(())
     }
@@ -162,12 +154,15 @@ impl HeadController {
             .ok_or_else(|| eyre!("head observation is unavailable"))?;
         ensure!(
             now >= observation.time,
-            "head observation is ahead of the request clock"
+            "head observation source time {:?} is ahead of node time {now:?}; \
+             check source/node clock alignment or clock rollback",
+            observation.time,
         );
         let age = now.duration_since(observation.time);
         ensure!(
             age <= maximum_age,
-            "head observation is stale: age={age:?}, maximum_age={maximum_age:?}"
+            "latest valid head observation is stale: age={age:?}, maximum_age={maximum_age:?}; \
+             check motor-state delivery and source/node clock alignment"
         );
         Ok(observation.value)
     }

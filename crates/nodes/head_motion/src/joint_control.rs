@@ -10,7 +10,6 @@ use crate::parameters::JointControlParameters;
 #[derive(Clone, Copy)]
 pub struct HeadObservation {
     pub positions: HeadJoints<f32>,
-    pub velocities: HeadJoints<f32>,
 }
 
 impl From<HeadJoints<MotorState>> for HeadObservation {
@@ -20,10 +19,6 @@ impl From<HeadJoints<MotorState>> for HeadObservation {
                 yaw: head.yaw.position,
                 pitch: head.pitch.position,
             },
-            velocities: HeadJoints {
-                yaw: head.yaw.velocity,
-                pitch: head.pitch.velocity,
-            },
         }
     }
 }
@@ -31,11 +26,8 @@ impl From<HeadJoints<MotorState>> for HeadObservation {
 impl HeadObservation {
     pub fn validate(&self) -> Result<()> {
         ensure!(
-            self.positions
-                .into_iter()
-                .chain(self.velocities)
-                .all(f32::is_finite),
-            "head observation contains non-finite values"
+            self.positions.into_iter().all(f32::is_finite),
+            "head observation contains non-finite positions"
         );
         Ok(())
     }

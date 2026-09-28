@@ -1,17 +1,14 @@
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{future::Future, pin::Pin, sync::Arc};
 
-use booster::LowState;
-use color_eyre::{Report, Result, eyre::WrapErr};
+use booster::MotorState;
+use color_eyre::{Report, Result};
 use coordinate_systems::{Ground, Robot};
-use kinematics::joints::head::HeadJoints;
+use kinematics::joints::{Joints, head::HeadJoints};
 use linear_algebra::Isometry3;
 use projection::camera_matrix::CameraMatrix;
 use ros_z::{
-    Result as RosResult,
     prelude::*,
-    pubsub::Received,
     qos::{QosDurability, QosHistory},
-    time::Time,
 };
 use ros_z_schema::{ServiceDef, compute_hash};
 use serde::{Deserialize, Serialize};
@@ -59,8 +56,8 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
         .build()
         .await?;
 
-    let low_state_sub = node
-        .subscriber::<LowState>("inputs/low_state")
+    let serial_motor_states_sub = node
+        .subscriber::<Joints<MotorState>>("inputs/serial_motor_states")
         .qos(QosProfile {
             history: QosHistory::from_depth(1),
             ..Default::default()
@@ -99,12 +96,18 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
 
     loop {
         tokio::select! {
-            received = low_state_sub.recv_with_metadata() => {
-                receive_observation(
-                    received, &mut controller, &mut logger,
-                    parameters.snapshot().typed().joint_control.warning_interval,
-                    node.clock().now(),
-                );
+            received = serial_motor_states_sub.recv_with_metadata() => {
+                let result = match received {
+                    Ok(received) => controller.observe(received.message.head.into(), received.source_time),
+                    Err(error) => Err(error.into()),
+                };
+                if let Err(error) = result {
+                    logger.log_error(
+                        FailureKind::Observation, None, &error,
+                        parameters.snapshot().typed().joint_control.warning_interval,
+                        node.clock().now(),
+                    );
+                }
             }
             received = head_motion_service.take_request_async() => {
                 let snapshot = parameters.snapshot();
@@ -151,33 +154,6 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                 }
             }
         }
-    }
-}
-
-fn receive_observation(
-    received: RosResult<Received<LowState>>,
-    controller: &mut HeadController,
-    logger: &mut NodeLogger,
-    warning_interval: Duration,
-    now: Time,
-) {
-    let result = received.map_err(Report::new).and_then(|received| {
-        let head = received
-            .message
-            .serial_motor_states()
-            .wrap_err("invalid serial motor states in LowState")?
-            .head;
-        controller.observe(head.into(), received.source_time)
-    });
-    if let Err(error) = result {
-        controller.invalidate_observation();
-        logger.log_error(
-            FailureKind::Observation,
-            None,
-            &error,
-            warning_interval,
-            now,
-        );
     }
 }
 
