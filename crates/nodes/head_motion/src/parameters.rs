@@ -10,7 +10,7 @@ use types::parameters::ImageRegionParameters;
 pub(crate) struct Parameters {
     pub(crate) joint_control: JointControlParameters,
 
-    /// Desired travel speeds for direct position and look-at requests.
+    /// Desired travel speeds in rad/s for direct position and look-at requests.
     pub(crate) direct_travel_speed: HeadJoints<f32>,
     /// Maximum age of the latest head measurement when answering a request.
     pub(crate) maximum_observation_age: Duration,
@@ -143,6 +143,7 @@ impl ScanParameters {
 pub(crate) struct JointControlParameters {
     pub(crate) kp: HeadJoints<f32>,
     pub(crate) kd: HeadJoints<f32>,
+    /// Maximum commanded angular velocity in rad/s.
     pub(crate) maximum_velocity: HeadJoints<f32>,
     pub(crate) damping_kd: HeadJoints<f32>,
     pub(crate) reseed_after: Duration,

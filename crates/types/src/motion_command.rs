@@ -179,9 +179,22 @@ pub enum HeadMotion {
     },
     Damping,
     MoveWithVelocity {
+        /// Desired yaw angular velocity in rad/s.
         yaw: f32,
+        /// Desired pitch angular velocity in rad/s.
         pitch: f32,
     },
+}
+
+impl HeadMotion {
+    pub fn validate(&self) -> Result<(), String> {
+        match self {
+            Self::MoveWithVelocity { yaw, pitch } if !yaw.is_finite() || !pitch.is_finite() => {
+                Err("head motion request contains non-finite velocities".into())
+            }
+            _ => Ok(()),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, Message)]

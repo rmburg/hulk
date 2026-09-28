@@ -3,15 +3,15 @@
     // Position feedback and damping gains, local to head motion.
     kp: { yaw: 12.0, pitch: 10.0 },
     kd: { yaw: 1.0, pitch: 1.2 },
-    // rad/s. The velocity ceiling is 2*pi for each joint.
-    maximum_velocity: { yaw: 6.283185307, pitch: 6.283185307 },
+    // rad/s. The velocity ceiling is pi for each joint.
+    maximum_velocity: { yaw: 3.141592654, pitch: 3.141592654 },
     damping_kd: { yaw: 1.2, pitch: 1.2 },
     reseed_after: { secs: 0, nanos: 100000000 },
     warning_interval: { secs: 1, nanos: 0 },
   },
 
   // Limits apply to position changes; acceleration and jerk are not limited.
-  direct_travel_speed: { yaw: 6.28, pitch: 3.14 },
+  direct_travel_speed: { yaw: 3.141592654, pitch: 3.141592654 },
   // 500 Hz observations normally arrive every 2 ms. Reject stale request inputs.
   maximum_observation_age: { secs: 0, nanos: 50000000 },
 

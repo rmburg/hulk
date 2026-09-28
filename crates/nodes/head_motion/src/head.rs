@@ -121,7 +121,7 @@ impl HeadController {
             elapsed,
             &parameters.joint_control,
             joint_limits,
-        )?;
+        );
         self.last_commanded_position = if mode == Mode::Damping {
             None
         } else {
@@ -210,10 +210,9 @@ impl HeadController {
                 return HeadTarget::new(move_to(target_position, scan_parameters.travel_speed));
             }
             HeadMotion::MoveWithVelocity { yaw, pitch } => {
-                return HeadTarget::new(move_to(
-                    start_position + HeadJoints { yaw, pitch },
-                    parameters.direct_travel_speed,
-                ));
+                return HeadTarget::new(JointTarget::MoveWithVelocity {
+                    velocity: HeadJoints { yaw, pitch },
+                });
             }
             HeadMotion::Center {
                 image_region_target,

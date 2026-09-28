@@ -110,8 +110,11 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                     }
                 };
                 let now = node.clock().now();
-                let result = inputs.snapshot(Arc::clone(&snapshot.typed))
-                    .and_then(|inputs| controller.evaluate(&request, &inputs, now));
+                let result = (|| {
+                    request.validate().map_err(Report::msg)?;
+                    let inputs = inputs.snapshot(Arc::clone(&snapshot.typed))?;
+                    controller.evaluate(&request, &inputs, now)
+                })();
                 let response = match result {
                     Ok(output) => {
                         logger.log_output(&request, &output, warning_interval, now);

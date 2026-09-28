@@ -38,6 +38,9 @@ pub(crate) enum JointTarget {
         position: HeadJoints<f32>,
         travel_speed: HeadJoints<f32>,
     },
+    MoveWithVelocity {
+        velocity: HeadJoints<f32>,
+    },
     Damping,
 }
 
@@ -48,43 +51,43 @@ impl JointTarget {
         elapsed: f32,
         parameters: &JointControlParameters,
         joint_limits: &JointLimits,
-    ) -> Result<HeadJoints<MotorCommand>> {
+    ) -> HeadJoints<MotorCommand> {
         let mut commands = HeadJoints::fill(MotorCommand::zeros());
-        match self {
-            Self::MoveTo {
-                position,
-                travel_speed,
-            } => {
-                ensure!(
-                    position.into_iter().all(f32::is_finite),
-                    "head target contains non-finite values"
-                );
-                for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
-                    let [minimum, maximum] = joint_limits.position.head[joint];
-                    let start = start_position[joint].clamp(minimum, maximum);
+        for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
+            let [minimum, maximum] = joint_limits.position.head[joint];
+            let start = start_position[joint].clamp(minimum, maximum);
+            let (position, kp, kd) = match self {
+                Self::MoveTo {
+                    position,
+                    travel_speed,
+                } => {
                     let goal = position[joint].clamp(minimum, maximum);
                     let step =
                         travel_speed[joint].min(parameters.maximum_velocity[joint]) * elapsed;
-                    commands[joint] = MotorCommand {
-                        position: (start + (goal - start).clamp(-step, step))
-                            .clamp(minimum, maximum),
-                        kp: parameters.kp[joint],
-                        kd: parameters.kd[joint],
-                        ..MotorCommand::zeros()
-                    };
+                    (
+                        (start + (goal - start).clamp(-step, step)).clamp(minimum, maximum),
+                        parameters.kp[joint],
+                        parameters.kd[joint],
+                    )
                 }
-            }
-            Self::Damping => {
-                for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
-                    let [minimum, maximum] = joint_limits.position.head[joint];
-                    commands[joint] = MotorCommand {
-                        position: start_position[joint].clamp(minimum, maximum),
-                        kd: parameters.damping_kd[joint],
-                        ..MotorCommand::zeros()
-                    };
+                Self::MoveWithVelocity { velocity } => {
+                    let maximum_velocity = parameters.maximum_velocity[joint];
+                    let velocity = velocity[joint].clamp(-maximum_velocity, maximum_velocity);
+                    (
+                        (start + velocity * elapsed).clamp(minimum, maximum),
+                        parameters.kp[joint],
+                        parameters.kd[joint],
+                    )
                 }
-            }
+                Self::Damping => (start, 0.0, parameters.damping_kd[joint]),
+            };
+            commands[joint] = MotorCommand {
+                position,
+                kp,
+                kd,
+                ..MotorCommand::zeros()
+            };
         }
-        Ok(commands)
+        commands
     }
 }
