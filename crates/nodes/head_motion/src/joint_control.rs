@@ -55,7 +55,7 @@ pub enum JointTarget {
 pub fn motor_commands(
     target: JointTarget,
     reference: HeadJoints<f32>,
-    elapsed: f64,
+    elapsed: f32,
     parameters: &JointControlParameters,
     limits: &JointLimits,
 ) -> Result<HeadJoints<MotorCommand>> {
@@ -70,14 +70,12 @@ pub fn motor_commands(
                 "head target contains non-finite values"
             );
             for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
-                let [minimum, maximum] = limits.position.head[joint].map(f64::from);
-                let start = f64::from(reference[joint]).clamp(minimum, maximum);
-                let goal = f64::from(position[joint]).clamp(minimum, maximum);
-                let step = f64::from(travel_speed[joint].min(parameters.maximum_velocity[joint]))
-                    * elapsed;
+                let [minimum, maximum] = limits.position.head[joint];
+                let start = reference[joint].clamp(minimum, maximum);
+                let goal = position[joint].clamp(minimum, maximum);
+                let step = travel_speed[joint].min(parameters.maximum_velocity[joint]) * elapsed;
                 commands[joint] = MotorCommand {
-                    position: (start + (goal - start).clamp(-step, step)).clamp(minimum, maximum)
-                        as f32,
+                    position: (start + (goal - start).clamp(-step, step)).clamp(minimum, maximum),
                     kp: parameters.kp[joint],
                     kd: parameters.kd[joint],
                     ..MotorCommand::zeros()

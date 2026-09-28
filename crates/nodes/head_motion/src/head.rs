@@ -128,7 +128,7 @@ impl HeadController {
         let reference = self.reference_position.unwrap_or(observation.positions);
         let elapsed = if self.reference_position.is_some() {
             self.last_evaluation
-                .map_or(0.0, |last| now.duration_since(last).as_secs_f64())
+                .map_or(0.0, |last| now.duration_since(last).as_secs_f32())
         } else {
             0.0
         };

@@ -1,6 +1,6 @@
 //! Analytic gaze geometry for K1. Target selection and motor control live elsewhere.
 
-use std::f64::consts::TAU;
+use std::f32::consts::TAU;
 
 use coordinate_systems::{Ground, Pixel, Robot};
 use kinematics::{joints::head::HeadJoints, robot_dimensions::RobotDimensions};
@@ -8,9 +8,8 @@ use linear_algebra::{Isometry3, Point2, Point3, nalgebra::Vector3, point};
 use projection::camera_matrix::CameraMatrix;
 use types::{motion_command::ImageRegion, parameters::ImageRegionParameters};
 
-// Numerical tolerances, not a behavioral arrival criterion. The final forward check
-// also guards roundoff when converting the analytic f64 solution into f32 commands.
-const MINIMUM_DISTANCE: f64 = 1e-6;
+// Numerical tolerances for solving and checking gaze geometry.
+const MINIMUM_DISTANCE: f32 = 1e-6;
 const MAXIMUM_PIXEL_ERROR: f32 = 0.05;
 
 pub struct GazeGeometry<'a> {
@@ -20,11 +19,11 @@ pub struct GazeGeometry<'a> {
 
 struct RayGeometry {
     /// Vector from the pitch pivot to the target, expressed in Robot axes.
-    pivot_target: Vector3<f64>,
+    pivot_target: Vector3<f32>,
     /// Camera optical center expressed in Head coordinates.
-    camera_origin: Vector3<f64>,
+    camera_origin: Vector3<f32>,
     /// Unit direction of the requested image ray, expressed in Head axes.
-    camera_ray: Vector3<f64>,
+    camera_ray: Vector3<f32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,7 +61,7 @@ pub fn look_at(
         camera_ray,
     } = ray_geometry(target, pixel, geometry);
     let mut best = None;
-    let mut best_distance = f64::INFINITY;
+    let mut best_distance = f32::INFINITY;
 
     for distance in
         ray_distances(pivot_target, camera_origin, camera_ray).ok_or(LookAtError::NoSolution)?
@@ -78,8 +77,8 @@ pub fn look_at(
             if !frames_target(candidate, target, pixel, geometry) {
                 continue;
             }
-            let distance = (f64::from(candidate.yaw) - f64::from(reference.yaw)).powi(2)
-                + (f64::from(candidate.pitch) - f64::from(reference.pitch)).powi(2);
+            let distance = (candidate.yaw - reference.yaw).powi(2)
+                + (candidate.pitch - reference.pitch).powi(2);
             if distance < best_distance {
                 best = Some(candidate);
                 best_distance = distance;
@@ -149,15 +148,13 @@ fn ray_geometry(
     let target_in_robot = camera.correction_in_robot * (geometry.ground_to_robot * target);
     // K1's pitch pivot lies on the yaw axis, so its position is independent of yaw.
     let pivot = RobotDimensions::ROBOT_TO_NECK.inner + RobotDimensions::NECK_TO_HEAD.inner;
-    let pivot_target = target_in_robot.inner.coords.cast::<f64>() - pivot.cast::<f64>();
-    let camera_to_head = camera.head_to_camera.inner.cast::<f64>().inverse();
+    let pivot_target = target_in_robot.inner.coords - pivot;
+    let camera_to_head = camera.head_to_camera.inner.inverse();
     let camera_origin = camera_to_head.translation.vector;
     let camera_ray = (camera_to_head.rotation
         * Vector3::new(
-            (f64::from(pixel.x()) - f64::from(camera.intrinsics.optical_center.x()))
-                / f64::from(camera.intrinsics.focals.x),
-            (f64::from(pixel.y()) - f64::from(camera.intrinsics.optical_center.y()))
-                / f64::from(camera.intrinsics.focals.y),
+            (pixel.x() - camera.intrinsics.optical_center.x()) / camera.intrinsics.focals.x,
+            (pixel.y() - camera.intrinsics.optical_center.y()) / camera.intrinsics.focals.y,
             1.0,
         ))
     .normalize();
@@ -171,10 +168,10 @@ fn ray_geometry(
 /// Rotations preserve distance to the pivot. Intersect c + d*r with the sphere
 /// of radius |target|: d² + 2(c·r)d + |c|² - |target|² = 0, with |r| = 1.
 fn ray_distances(
-    target: Vector3<f64>,
-    origin: Vector3<f64>,
-    ray: Vector3<f64>,
-) -> Option<[f64; 2]> {
+    target: Vector3<f32>,
+    origin: Vector3<f32>,
+    ray: Vector3<f32>,
+) -> Option<[f32; 2]> {
     let along = origin.dot(&ray);
     let constant = origin.norm_squared() - target.norm_squared();
     let discriminant = along * along - constant;
@@ -193,25 +190,25 @@ fn ray_distances(
 /// Solve target = Rz(yaw) * Ry(pitch) * point. Pitch preserves the Y coordinate;
 /// yaw preserves height. Both possible signs of the intermediate X are considered.
 fn joint_solutions(
-    target: Vector3<f64>,
-    point: Vector3<f64>,
+    target: Vector3<f32>,
+    point: Vector3<f32>,
     reference: HeadJoints<f32>,
 ) -> Option<[HeadJoints<f32>; 2]> {
     let horizontal_squared = target.x * target.x + target.y * target.y;
     let x_squared = horizontal_squared - point.y * point.y;
-    let roundoff = 1e-12 * target.norm_squared().max(point.norm_squared());
+    let roundoff = 8.0 * f32::EPSILON * target.norm_squared().max(point.norm_squared());
     if x_squared < -roundoff {
         return None;
     }
     Some(
         [x_squared.max(0.0).sqrt(), -x_squared.max(0.0).sqrt()].map(|x| {
             let yaw = if horizontal_squared <= MINIMUM_DISTANCE.powi(2) {
-                f64::from(reference.yaw)
+                reference.yaw
             } else {
                 target.y.atan2(target.x) - point.y.atan2(x)
             };
             let pitch = if point.x.hypot(point.z) <= MINIMUM_DISTANCE {
-                f64::from(reference.pitch)
+                reference.pitch
             } else {
                 point.z.atan2(point.x) - target.z.atan2(x)
             };
@@ -223,8 +220,8 @@ fn joint_solutions(
     )
 }
 
-fn nearest_equivalent(angle: f64, reference: f32) -> f32 {
-    (angle + TAU * ((f64::from(reference) - angle) / TAU).round()) as f32
+fn nearest_equivalent(angle: f32, reference: f32) -> f32 {
+    angle + TAU * ((reference - angle) / TAU).round()
 }
 
 fn frames_target(
@@ -235,7 +232,7 @@ fn frames_target(
 ) -> bool {
     let camera = geometry.camera_matrix;
     let camera_target = camera.ground_to_camera_at(&joints, geometry.ground_to_robot) * target;
-    if camera_target.z() <= MINIMUM_DISTANCE as f32 {
+    if camera_target.z() <= MINIMUM_DISTANCE {
         return false;
     }
     let projected = camera.intrinsics.project(camera_target.coords());
