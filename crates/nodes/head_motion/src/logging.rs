@@ -14,13 +14,14 @@ pub enum FailureKind {
     Observation,
     Request,
     Response,
+    JointLimits,
 }
 
 #[derive(Default)]
 pub struct NodeLogger {
     hold_reason: Option<HoldReason>,
     hold: WarningThrottle,
-    failures: [WarningThrottle; 3],
+    failures: [WarningThrottle; 4],
 }
 
 impl NodeLogger {

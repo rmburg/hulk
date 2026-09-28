@@ -12,8 +12,8 @@ use types::{motion_command::ImageRegion, parameters::ImageRegionParameters};
 const MINIMUM_DISTANCE: f32 = 1e-6;
 const MAXIMUM_PIXEL_ERROR: f32 = 0.05;
 
-pub struct GazeGeometry<'a> {
-    pub camera_matrix: &'a CameraMatrix,
+pub struct GazeGeometry {
+    pub camera_matrix: CameraMatrix,
     pub ground_to_robot: Isometry3<Ground, Robot>,
 }
 
@@ -42,7 +42,7 @@ pub fn look_at(
     target: Point2<Ground>,
     height_above_ground: f32,
     image_region: ImageRegion,
-    geometry: &GazeGeometry<'_>,
+    geometry: &GazeGeometry,
     parameters: &ImageRegionParameters,
     reference: HeadJoints<f32>,
 ) -> Result<HeadJoints<f32>, LookAtError> {
@@ -90,25 +90,20 @@ pub fn look_at(
 fn requested_pixel(
     region: ImageRegion,
     parameters: &ImageRegionParameters,
-    geometry: &GazeGeometry<'_>,
+    geometry: &GazeGeometry,
 ) -> Result<Point2<Pixel>, LookAtError> {
-    let camera = geometry.camera_matrix;
+    let camera = &geometry.camera_matrix;
     let normalized = match region {
         ImageRegion::Center => parameters.center,
         ImageRegion::Bottom => parameters.bottom,
         ImageRegion::Top => parameters.top,
     };
-    let valid = normalized
+    let valid = camera
+        .image_size
         .inner
-        .coords
         .iter()
-        .all(|value| (0.0..=1.0).contains(value))
-        && camera
-            .image_size
-            .inner
-            .iter()
-            .chain(camera.intrinsics.focals.iter())
-            .all(|value| value.is_finite() && *value > 0.0)
+        .chain(camera.intrinsics.focals.iter())
+        .all(|value| value.is_finite() && *value > 0.0)
         && camera
             .intrinsics
             .optical_center
@@ -141,9 +136,9 @@ fn valid_transform<From, To>(transform: Isometry3<From, To>) -> bool {
 fn ray_geometry(
     target: Point3<Ground>,
     pixel: Point2<Pixel>,
-    geometry: &GazeGeometry<'_>,
+    geometry: &GazeGeometry,
 ) -> RayGeometry {
-    let camera = geometry.camera_matrix;
+    let camera = &geometry.camera_matrix;
     let target_in_robot = camera.correction_in_robot * (geometry.ground_to_robot * target);
     // K1's pitch pivot lies on the yaw axis, so its position is independent of yaw.
     let pivot = head_to_robot(&HeadJoints::default()).translation();
@@ -221,9 +216,9 @@ fn frames_target(
     joints: HeadJoints<f32>,
     target: Point3<Ground>,
     pixel: Point2<Pixel>,
-    geometry: &GazeGeometry<'_>,
+    geometry: &GazeGeometry,
 ) -> bool {
-    let camera = geometry.camera_matrix;
+    let camera = &geometry.camera_matrix;
     let camera_target = camera.ground_to_camera_at(&joints, geometry.ground_to_robot) * target;
     if camera_target.z() <= MINIMUM_DISTANCE {
         return false;

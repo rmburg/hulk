@@ -1,20 +1,21 @@
 //! Request resolution and coordination, independent of ROS interfaces and logging.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use color_eyre::{
     Result,
-    eyre::{WrapErr, ensure, eyre},
+    eyre::{ensure, eyre},
 };
 use coordinate_systems::Ground;
 use kinematics::joints::head::HeadJoints;
 use linear_algebra::{Point2, Rotation2, point};
 use ros_z::time::Time;
 use types::{
-    field_dimensions::{FieldDimensions, GlobalFieldSide},
+    field_dimensions::GlobalFieldSide,
     joint_limits::JointLimits,
     motion_command::{HeadMotion, ImageRegion},
     motor_command::MotorCommand,
+    parameters::ImageRegionParameters,
     support_foot::Side,
 };
 
@@ -25,13 +26,12 @@ use crate::{
     patterns::{GlanceState, ScanKind, ScanState},
 };
 
-/// A consistent request-time snapshot. Geometry and field dimensions are only
-/// required by the motions that use them; joint limits are always required.
-pub struct HeadContext<'a> {
-    pub geometry: Option<GazeGeometry<'a>>,
-    pub joint_limits: Option<&'a JointLimits>,
-    pub field_dimensions: Option<&'a FieldDimensions>,
-    pub field_side: Option<GlobalFieldSide>,
+pub struct HeadInputs {
+    pub parameters: Arc<Parameters>,
+    pub joint_limits: Arc<JointLimits>,
+    pub geometry: Option<GazeGeometry>,
+    pub field_width: Option<f32>,
+    pub global_field_side: Option<GlobalFieldSide>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,32 +89,16 @@ impl HeadController {
         Ok(())
     }
 
-    /// Evaluate only when central motion requests commands. Errors produce no output;
-    /// geometry failures produce a bounded hold command and a structured reason.
     pub fn evaluate(
         &mut self,
         request: &HeadMotion,
-        context: &HeadContext<'_>,
-        parameters: &Parameters,
+        inputs: &HeadInputs,
         now: Time,
     ) -> Result<HeadOutput> {
-        self.evaluate_request(request, context, parameters, now)
-            .wrap_err_with(|| format!("failed to evaluate head request {request:?}"))
-    }
-
-    fn evaluate_request(
-        &mut self,
-        request: &HeadMotion,
-        context: &HeadContext<'_>,
-        parameters: &Parameters,
-        now: Time,
-    ) -> Result<HeadOutput> {
-        parameters.validate().map_err(|reason| eyre!(reason))?;
+        let parameters = &inputs.parameters;
         let observation = self.current_observation(now, parameters.maximum_observation_age)?;
-        let joints = context
-            .joint_limits
-            .ok_or_else(|| eyre!("head joint limits are unavailable"))?;
-        joints.validate().map_err(|reason| eyre!(reason))?;
+        let joint_limits = &inputs.joint_limits;
+
         let mode = mode_for(request, parameters.injected_head_joints.is_some());
         self.prepare_mode(mode, now, parameters.joint_control.reseed_after);
         let reference = self.reference_position.unwrap_or(observation.positions);
@@ -124,13 +108,13 @@ impl HeadController {
         } else {
             0.0
         };
-        let resolution = self.resolve(request, context, parameters, reference, now);
+        let resolution = self.resolve(request, inputs, reference, now);
         let commands = motor_commands(
             resolution.target,
             reference,
             elapsed,
             &parameters.joint_control,
-            joints,
+            joint_limits,
         )?;
         self.reference_position = if mode == Mode::Damping {
             None
@@ -185,11 +169,11 @@ impl HeadController {
     fn resolve(
         &mut self,
         request: &HeadMotion,
-        context: &HeadContext<'_>,
-        parameters: &Parameters,
+        inputs: &HeadInputs,
         reference: HeadJoints<f32>,
         now: Time,
     ) -> Resolution {
+        let parameters = &inputs.parameters;
         if let Some(position) = parameters.injected_head_joints {
             self.hold_target = None;
             return Resolution::motion(move_to(position, parameters.direct_travel_speed));
@@ -208,7 +192,7 @@ impl HeadController {
             }
             HeadMotion::Center {
                 image_region_target,
-            } => self.center(image_region_target, context, parameters, reference),
+            } => self.center(image_region_target, inputs, reference),
             HeadMotion::LookAt {
                 target,
                 height_above_ground,
@@ -218,8 +202,8 @@ impl HeadController {
                     target,
                     height_above_ground,
                     image_region_target,
-                    context,
-                    parameters,
+                    inputs.geometry.as_ref(),
+                    &parameters.image_region_parameters,
                     reference,
                 );
                 self.gaze_motion(angles, parameters.direct_travel_speed, reference)
@@ -230,7 +214,7 @@ impl HeadController {
                 } else {
                     ScanKind::SearchForLostBall
                 };
-                let side = if context.field_side == Some(GlobalFieldSide::Away) {
+                let side = if inputs.global_field_side == Some(GlobalFieldSide::Away) {
                     Side::Right
                 } else {
                     Side::Left
@@ -256,13 +240,12 @@ impl HeadController {
                     Rotation2::<Ground, Ground>::new(angle) * target,
                     height_above_ground,
                     ImageRegion::Center,
-                    context,
-                    parameters,
+                    inputs.geometry.as_ref(),
+                    &parameters.image_region_parameters,
                     reference,
                 );
                 self.gaze_motion(angles, parameters.glance.travel_speed, reference)
             }
-            // Yaw and pitch are angular offsets applied once per request.
             HeadMotion::MoveWithVelocity { yaw, pitch } => {
                 self.hold_target = None;
                 Resolution::motion(move_to(
@@ -276,23 +259,23 @@ impl HeadController {
     fn center(
         &mut self,
         image_region: ImageRegion,
-        context: &HeadContext<'_>,
-        parameters: &Parameters,
+        inputs: &HeadInputs,
         reference: HeadJoints<f32>,
     ) -> Resolution {
-        let angles = context
-            .field_dimensions
+        let parameters = &inputs.parameters;
+        let angles = inputs
+            .field_width
             .ok_or(HoldReason::MissingFieldDimensions)
-            .and_then(|field| {
-                if !field.width.is_finite() || field.width <= 0.0 {
+            .and_then(|width| {
+                if !width.is_finite() || width <= 0.0 {
                     return Err(HoldReason::InvalidFieldWidth);
                 }
                 gaze(
-                    point![field.width / 2.0, 0.0],
+                    point![width / 2.0, 0.0],
                     0.0,
                     image_region,
-                    context,
-                    parameters,
+                    inputs.geometry.as_ref(),
+                    &parameters.image_region_parameters,
                     reference,
                 )
             });
@@ -361,20 +344,17 @@ fn gaze(
     target: Point2<Ground>,
     height: f32,
     image_region: ImageRegion,
-    context: &HeadContext<'_>,
-    parameters: &Parameters,
+    geometry: Option<&GazeGeometry>,
+    parameters: &ImageRegionParameters,
     reference: HeadJoints<f32>,
 ) -> Result<HeadJoints<f32>, HoldReason> {
-    let geometry = context
-        .geometry
-        .as_ref()
-        .ok_or(HoldReason::MissingGeometry)?;
+    let geometry = geometry.ok_or(HoldReason::MissingGeometry)?;
     look_at(
         target,
         height,
         image_region,
         geometry,
-        &parameters.image_region_parameters,
+        parameters,
         reference,
     )
     .map_err(HoldReason::Geometry)

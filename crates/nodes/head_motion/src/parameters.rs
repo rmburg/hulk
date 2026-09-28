@@ -44,6 +44,20 @@ impl Parameters {
         {
             return Err("injected_head_joints must contain finite positions".into());
         }
+        for (name, position) in [
+            ("center", self.image_region_parameters.center),
+            ("bottom", self.image_region_parameters.bottom),
+            ("top", self.image_region_parameters.top),
+        ] {
+            if ![position.x(), position.y()]
+                .into_iter()
+                .all(|value| (0.0..=1.0).contains(&value))
+            {
+                return Err(format!(
+                    "image_region_parameters.{name} must contain finite coordinates in [0, 1]"
+                ));
+            }
+        }
         self.look_around
             .validate()
             .map_err(|error| format!("look_around.{error}"))?;

@@ -1,12 +1,13 @@
 use std::{future::Future, pin::Pin, sync::Arc};
 
 use booster::MotorState;
-use color_eyre::{Report, Result};
+use color_eyre::{Report, Result, eyre::eyre};
 use coordinate_systems::{Ground, Robot};
 use kinematics::joints::{Joints, head::HeadJoints};
 use linear_algebra::Isometry3;
 use projection::camera_matrix::CameraMatrix;
 use ros_z::{
+    cache::Cache,
     prelude::*,
     qos::{QosDurability, QosHistory},
 };
@@ -19,7 +20,7 @@ use types::{
 };
 
 use crate::{
-    head::{HeadContext, HeadController},
+    head::{HeadController, HeadInputs},
     logging::{FailureKind, NodeLogger},
     look_at::GazeGeometry,
     parameters::Parameters,
@@ -36,23 +37,15 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
 
     let parameters = node.bind_parameter_as::<Parameters>("head_motion")?;
     parameters.add_validation_hook(Parameters::validate)?;
-    let joint_limits_cache = node
+    let mut inputs = InputCaches::new(&node).await?;
+
+    let joint_limits_sub = node
         .subscriber::<JointLimits>("joint_limits")
         .qos(QosProfile {
             durability: QosDurability::TransientLocal,
+            history: QosHistory::from_depth(1),
             ..Default::default()
         })
-        .cache(1)
-        .build()
-        .await?;
-
-    let field_dimensions_cache = node
-        .subscriber::<FieldDimensions>("field_dimensions")
-        .qos(QosProfile {
-            durability: QosDurability::TransientLocal,
-            ..Default::default()
-        })
-        .cache(1)
         .build()
         .await?;
 
@@ -62,23 +55,6 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
             history: QosHistory::from_depth(1),
             ..Default::default()
         })
-        .build()
-        .await?;
-    let camera_matrix_cache = node
-        .subscriber::<TimeWrapper<CameraMatrix>>("camera_matrix")
-        .cache(1)
-        .with_stamp(|wrapper: &TimeWrapper<CameraMatrix>| wrapper.time)
-        .build()
-        .await?;
-    let ground_to_robot_cache = node
-        .subscriber::<TimeWrapper<Option<Isometry3<Ground, Robot>>>>("ground_to_robot")
-        .cache(1)
-        .with_stamp(|wrapper: &TimeWrapper<Option<Isometry3<Ground, Robot>>>| wrapper.time)
-        .build()
-        .await?;
-    let filtered_game_controller_state_cache = node
-        .subscriber::<FilteredGameControllerState>("filtered_game_controller_state")
-        .cache(1)
         .build()
         .await?;
 
@@ -96,6 +72,19 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
 
     loop {
         tokio::select! {
+            received = joint_limits_sub.recv() => {
+                let result = match received {
+                    Ok(joint_limits) => inputs.update_joint_limits(joint_limits),
+                    Err(error) => Err(error.into()),
+                };
+                if let Err(error) = result {
+                    logger.log_error(
+                        FailureKind::JointLimits, None, &error,
+                        parameters.snapshot().typed().joint_control.warning_interval,
+                        node.clock().now(),
+                    );
+                }
+            }
             received = serial_motor_states_sub.recv_with_metadata() => {
                 let result = match received {
                     Ok(received) => controller.observe(received.message.head.into(), received.source_time),
@@ -111,49 +100,118 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
             }
             received = head_motion_service.take_request_async() => {
                 let snapshot = parameters.snapshot();
-                let parameters = snapshot.typed();
+                let warning_interval = snapshot.typed().joint_control.warning_interval;
                 let (request, reply) = match received {
                     Ok(received) => received.into_parts(),
                     Err(error) => {
                         logger.log_error(FailureKind::Request, None, &error.into(),
-                            parameters.joint_control.warning_interval, node.clock().now());
+                            warning_interval, node.clock().now());
                         continue;
                     }
                 };
-                let camera = camera_matrix_cache.get_latest();
-                let ground = ground_to_robot_cache.get_latest();
-                let limits = joint_limits_cache.get_latest();
-                let field = field_dimensions_cache.get_latest();
-                let game = filtered_game_controller_state_cache.get_latest();
-                let context = HeadContext {
-                    geometry: camera.as_deref().zip(ground.as_deref()).and_then(|(camera, ground)| {
-                        ground.inner.map(|ground_to_robot| GazeGeometry {
-                            camera_matrix: &camera.inner,
-                            ground_to_robot,
-                        })
-                    }),
-                    joint_limits: limits.as_deref(),
-                    field_dimensions: field.as_deref(),
-                    field_side: game.as_deref().map(|game| game.global_field_side),
-                };
                 let now = node.clock().now();
-                let response = match controller.evaluate(&request, &context, parameters, now) {
+                let result = inputs.snapshot(Arc::clone(&snapshot.typed))
+                    .and_then(|inputs| controller.evaluate(&request, &inputs, now));
+                let response = match result {
                     Ok(output) => {
-                        logger.log_output(&request, &output, parameters.joint_control.warning_interval, now);
+                        logger.log_output(&request, &output, warning_interval, now);
                         Ok(output.commands)
                     }
                     Err(error) => {
                         logger.log_error(FailureKind::Request, Some(&request), &error,
-                            parameters.joint_control.warning_interval, now);
+                            warning_interval, now);
                         Err(HeadMotionError { source: Arc::new(error) })
                     }
                 };
                 if let Err(error) = reply.reply_async(&response).await {
                     logger.log_error(FailureKind::Response, Some(&request), &error.into(),
-                        parameters.joint_control.warning_interval, now);
+                        warning_interval, now);
                 }
             }
         }
+    }
+}
+
+struct InputCaches {
+    joint_limits: Option<Arc<JointLimits>>,
+    field_dimensions: Cache<FieldDimensions>,
+    camera_matrix: Cache<TimeWrapper<CameraMatrix>>,
+    ground_to_robot: Cache<TimeWrapper<Option<Isometry3<Ground, Robot>>>>,
+    game_controller_state: Cache<FilteredGameControllerState>,
+}
+
+impl InputCaches {
+    async fn new(node: &Node) -> Result<Self> {
+        let field_dimensions_cache = node
+            .subscriber::<FieldDimensions>("field_dimensions")
+            .qos(QosProfile {
+                durability: QosDurability::TransientLocal,
+                ..Default::default()
+            })
+            .cache(1)
+            .build()
+            .await?;
+
+        let camera_matrix_cache = node
+            .subscriber::<TimeWrapper<CameraMatrix>>("camera_matrix")
+            .cache(1)
+            .with_stamp(|wrapper: &TimeWrapper<CameraMatrix>| wrapper.time)
+            .build()
+            .await?;
+        let ground_to_robot_cache = node
+            .subscriber::<TimeWrapper<Option<Isometry3<Ground, Robot>>>>("ground_to_robot")
+            .cache(1)
+            .with_stamp(|wrapper: &TimeWrapper<Option<Isometry3<Ground, Robot>>>| wrapper.time)
+            .build()
+            .await?;
+        let filtered_game_controller_state_cache = node
+            .subscriber::<FilteredGameControllerState>("filtered_game_controller_state")
+            .cache(1)
+            .build()
+            .await?;
+
+        Ok(Self {
+            joint_limits: None,
+            field_dimensions: field_dimensions_cache,
+            camera_matrix: camera_matrix_cache,
+            ground_to_robot: ground_to_robot_cache,
+            game_controller_state: filtered_game_controller_state_cache,
+        })
+    }
+
+    fn update_joint_limits(&mut self, joint_limits: JointLimits) -> Result<()> {
+        self.joint_limits = None;
+        joint_limits.validate().map_err(Report::msg)?;
+        self.joint_limits = Some(Arc::new(joint_limits));
+        Ok(())
+    }
+
+    fn snapshot(&self, parameters: Arc<Parameters>) -> Result<HeadInputs> {
+        let joint_limits = self
+            .joint_limits
+            .clone()
+            .ok_or_else(|| eyre!("head joint limits are unavailable"))?;
+        let field_width = self.field_dimensions.get_latest().map(|field| field.width);
+        let geometry = self
+            .ground_to_robot
+            .get_latest()
+            .and_then(|ground| ground.inner)
+            .zip(self.camera_matrix.get_latest())
+            .map(|(ground_to_robot, camera)| GazeGeometry {
+                camera_matrix: camera.inner.clone(),
+                ground_to_robot,
+            });
+        let global_field_side = self
+            .game_controller_state
+            .get_latest()
+            .map(|game| game.global_field_side);
+        Ok(HeadInputs {
+            parameters,
+            joint_limits,
+            geometry,
+            field_width,
+            global_field_side,
+        })
     }
 }
 
