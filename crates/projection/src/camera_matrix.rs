@@ -14,8 +14,6 @@ use crate::{
 pub struct CameraMatrix {
     pub ground_to_robot: Isometry3<Ground, Robot>,
     pub robot_to_head: Isometry3<Robot, Head>,
-    /// Already included in `robot_to_head`; retained to evaluate other head poses
-    /// without losing or applying the calibration twice.
     pub correction_in_robot: Rotation3<Robot, Robot>,
     pub head_to_camera: Isometry3<Head, Camera>,
     pub intrinsics: Intrinsic,
@@ -105,9 +103,6 @@ impl CameraMatrix {
             CameraProjection::new(self.ground_to_camera, self.intrinsics).inverse(0.0);
     }
 
-    /// Evaluate the full ground-to-camera chain at a candidate head pose.
-    /// The caller supplies the ground transform for the evaluation time. Camera
-    /// calibration comes from this snapshot; its measured head pose is not reused.
     pub fn ground_to_camera_at(
         &self,
         head: &HeadJoints<f32>,
@@ -162,7 +157,7 @@ mod tests {
 
     #[test]
     fn check_field_of_view_calculation() {
-        // Old implementation, assumes normalized values
+        // Reference calculation using normalized focal lengths.
         fn old_fov(focal_lengths: nalgebra::Vector2<f32>) -> nalgebra::Vector2<f32> {
             focal_lengths.map(|f| 2.0 * (0.5 / f).atan())
         }

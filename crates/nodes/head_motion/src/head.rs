@@ -195,7 +195,6 @@ impl HeadController {
         reference: HeadJoints<f32>,
         now: Time,
     ) -> Resolution {
-        // Preserve the existing explicit debug override; it still uses joint control.
         if let Some(position) = parameters.injected_head_joints {
             self.hold_target = None;
             return Resolution::motion(move_to(position, parameters.direct_travel_speed));
@@ -268,7 +267,7 @@ impl HeadController {
                 );
                 self.gaze_motion(angles, parameters.glance.travel_speed, reference)
             }
-            // Preserve the existing per-request angular offset interpretation.
+            // Yaw and pitch are angular offsets applied once per request.
             HeadMotion::MoveWithVelocity { yaw, pitch } => {
                 self.hold_target = None;
                 Resolution::motion(move_to(
