@@ -16,7 +16,7 @@ macro_rules! generate_coordinate_system {
                 Serialize,
                 RelativeEq,
                 AbsDiffEq,
-                                                    ros_z::Message,
+                ros_z::Message,
             )]
             #[abs_diff_eq(epsilon_type = f32)]
             $(#[$doc])*
