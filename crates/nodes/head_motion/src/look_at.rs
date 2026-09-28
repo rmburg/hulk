@@ -2,9 +2,9 @@
 
 use std::f32::consts::TAU;
 
-use coordinate_systems::{Ground, Pixel, Robot};
-use kinematics::{joints::head::HeadJoints, robot_dimensions::RobotDimensions};
-use linear_algebra::{Isometry3, Point2, Point3, nalgebra::Vector3, point};
+use coordinate_systems::{Ground, Head, Pixel, Robot};
+use kinematics::{forward::head_to_robot, joints::head::HeadJoints};
+use linear_algebra::{Isometry3, Point2, Point3, Vector3, point};
 use projection::camera_matrix::CameraMatrix;
 use types::{motion_command::ImageRegion, parameters::ImageRegionParameters};
 
@@ -18,12 +18,11 @@ pub struct GazeGeometry<'a> {
 }
 
 struct RayGeometry {
-    /// Vector from the pitch pivot to the target, expressed in Robot axes.
-    pivot_target: Vector3<f32>,
-    /// Camera optical center expressed in Head coordinates.
-    camera_origin: Vector3<f32>,
-    /// Unit direction of the requested image ray, expressed in Head axes.
-    camera_ray: Vector3<f32>,
+    /// Vector from the pitch pivot to the target, expressed in Robot.
+    pivot_target: Vector3<Robot>,
+    camera_origin: Point3<Head>,
+    /// Unit direction of the requested image ray, expressed in Head.
+    camera_ray: Vector3<Head>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +68,7 @@ pub fn look_at(
         if distance <= MINIMUM_DISTANCE || !distance.is_finite() {
             continue;
         }
-        let point_on_ray = camera_origin + distance * camera_ray;
+        let point_on_ray = camera_origin + camera_ray * distance;
         let Some(candidates) = joint_solutions(pivot_target, point_on_ray, reference) else {
             continue;
         };
@@ -147,17 +146,11 @@ fn ray_geometry(
     let camera = geometry.camera_matrix;
     let target_in_robot = camera.correction_in_robot * (geometry.ground_to_robot * target);
     // K1's pitch pivot lies on the yaw axis, so its position is independent of yaw.
-    let pivot = RobotDimensions::ROBOT_TO_NECK.inner + RobotDimensions::NECK_TO_HEAD.inner;
-    let pivot_target = target_in_robot.inner.coords - pivot;
-    let camera_to_head = camera.head_to_camera.inner.inverse();
-    let camera_origin = camera_to_head.translation.vector;
-    let camera_ray = (camera_to_head.rotation
-        * Vector3::new(
-            (pixel.x() - camera.intrinsics.optical_center.x()) / camera.intrinsics.focals.x,
-            (pixel.y() - camera.intrinsics.optical_center.y()) / camera.intrinsics.focals.y,
-            1.0,
-        ))
-    .normalize();
+    let pivot = head_to_robot(&HeadJoints::default()).translation();
+    let pivot_target = target_in_robot - pivot;
+    let camera_to_head = camera.head_to_camera.inverse();
+    let camera_origin = camera_to_head.translation();
+    let camera_ray = (camera_to_head * camera.intrinsics.bearing(pixel)).normalize();
     RayGeometry {
         pivot_target,
         camera_origin,
@@ -168,12 +161,12 @@ fn ray_geometry(
 /// Rotations preserve distance to the pivot. Intersect c + d*r with the sphere
 /// of radius |target|: d² + 2(c·r)d + |c|² - |target|² = 0, with |r| = 1.
 fn ray_distances(
-    target: Vector3<f32>,
-    origin: Vector3<f32>,
-    ray: Vector3<f32>,
+    target: Vector3<Robot>,
+    origin: Point3<Head>,
+    ray: Vector3<Head>,
 ) -> Option<[f32; 2]> {
-    let along = origin.dot(&ray);
-    let constant = origin.norm_squared() - target.norm_squared();
+    let along = origin.coords().dot(&ray);
+    let constant = origin.coords().norm_squared() - target.norm_squared();
     let discriminant = along * along - constant;
     if discriminant < 0.0 {
         return None;
@@ -190,13 +183,13 @@ fn ray_distances(
 /// Solve target = Rz(yaw) * Ry(pitch) * point. Pitch preserves the Y coordinate;
 /// yaw preserves height. Both possible signs of the intermediate X are considered.
 fn joint_solutions(
-    target: Vector3<f32>,
-    point: Vector3<f32>,
+    target: Vector3<Robot>,
+    point: Point3<Head>,
     reference: HeadJoints<f32>,
 ) -> Option<[HeadJoints<f32>; 2]> {
-    let horizontal_squared = target.x * target.x + target.y * target.y;
-    let x_squared = horizontal_squared - point.y * point.y;
-    let roundoff = 8.0 * f32::EPSILON * target.norm_squared().max(point.norm_squared());
+    let horizontal_squared = target.x() * target.x() + target.y() * target.y();
+    let x_squared = horizontal_squared - point.y() * point.y();
+    let roundoff = 8.0 * f32::EPSILON * target.norm_squared().max(point.coords().norm_squared());
     if x_squared < -roundoff {
         return None;
     }
@@ -205,12 +198,12 @@ fn joint_solutions(
             let yaw = if horizontal_squared <= MINIMUM_DISTANCE.powi(2) {
                 reference.yaw
             } else {
-                target.y.atan2(target.x) - point.y.atan2(x)
+                target.y().atan2(target.x()) - point.y().atan2(x)
             };
-            let pitch = if point.x.hypot(point.z) <= MINIMUM_DISTANCE {
+            let pitch = if point.x().hypot(point.z()) <= MINIMUM_DISTANCE {
                 reference.pitch
             } else {
-                point.z.atan2(point.x) - target.z.atan2(x)
+                point.z().atan2(point.x()) - target.z().atan2(x)
             };
             HeadJoints {
                 yaw: nearest_equivalent(yaw, reference.yaw),
