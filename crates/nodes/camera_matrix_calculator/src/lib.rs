@@ -4,7 +4,7 @@ use std::{boxed::Box, future::Future, pin::Pin};
 use color_eyre::Result;
 
 use coordinate_systems::{Ground, Robot};
-use kinematics::{forward::head_to_left_camera, robot_kinematics::RobotKinematics};
+use kinematics::{forward::head_to_camera, robot_kinematics::RobotKinematics};
 use linear_algebra::{Isometry3, Rotation3, vector};
 use projection::camera_matrix::CameraMatrix;
 use ros_z::prelude::*;
@@ -79,8 +79,7 @@ fn compute_camera_matrix(
     camera_info: &CameraInfo,
 ) -> CameraMatrix {
     let image_size = vector![camera_info.width as f32, camera_info.height as f32];
-    // inputs/camera_info describes the left image, so use its optical center.
-    let head_to_camera = head_to_left_camera(parameters.camera_to_head_pitch.to_radians());
+    let head_to_camera = head_to_camera(parameters.camera_to_head_pitch.to_radians());
 
     let uncorrected_camera_matrix = CameraMatrix::from_camera_info(
         camera_info,

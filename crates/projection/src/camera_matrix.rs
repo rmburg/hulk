@@ -1,4 +1,4 @@
-use coordinate_systems::{Ground, Head, LeftCamera, Pixel, Robot};
+use coordinate_systems::{Camera, Ground, Head, Pixel, Robot};
 use kinematics::{forward::head_to_robot, joints::head::HeadJoints};
 use linear_algebra::{IntoFramed, Isometry3, Rotation3, Vector2};
 use ros2::sensor_msgs::camera_info::CameraInfo;
@@ -17,14 +17,14 @@ pub struct CameraMatrix {
     /// Already included in `robot_to_head`; retained to evaluate other head poses
     /// without losing or applying the calibration twice.
     pub correction_in_robot: Rotation3<Robot, Robot>,
-    pub head_to_camera: Isometry3<Head, LeftCamera>,
+    pub head_to_camera: Isometry3<Head, Camera>,
     pub intrinsics: Intrinsic,
     pub field_of_view: nalgebra::Vector2<f32>,
     pub horizon: Option<Horizon>,
     pub image_size: Vector2<Pixel>,
 
     // Precomputed values for faster calculations
-    pub ground_to_camera: Isometry3<Ground, LeftCamera>,
+    pub ground_to_camera: Isometry3<Ground, Camera>,
 
     pub ground_to_pixel: CameraProjection<Ground>,
     pub pixel_to_ground: InverseCameraProjection<Ground>,
@@ -38,7 +38,7 @@ impl CameraMatrix {
         image_size: Vector2<Pixel>,
         ground_to_robot: Isometry3<Ground, Robot>,
         robot_to_head: Isometry3<Robot, Head>,
-        head_to_camera: Isometry3<Head, LeftCamera>,
+        head_to_camera: Isometry3<Head, Camera>,
     ) -> Self {
         let focal_length_scaled = focal_length.component_mul(&image_size.inner);
         let optical_center_scaled = optical_center
@@ -74,7 +74,7 @@ impl CameraMatrix {
         image_size: Vector2<Pixel>,
         ground_to_robot: Isometry3<Ground, Robot>,
         robot_to_head: Isometry3<Robot, Head>,
-        head_to_camera: Isometry3<Head, LeftCamera>,
+        head_to_camera: Isometry3<Head, Camera>,
     ) -> Self {
         let intrinsics = Intrinsic::from(camera_info);
         let field_of_view = Intrinsic::calculate_field_of_view(intrinsics.focals, image_size);
@@ -105,14 +105,14 @@ impl CameraMatrix {
             CameraProjection::new(self.ground_to_camera, self.intrinsics).inverse(0.0);
     }
 
-    /// Evaluate the full ground-to-left-camera chain at a candidate head pose.
+    /// Evaluate the full ground-to-camera chain at a candidate head pose.
     /// The caller supplies the ground transform for the evaluation time. Camera
     /// calibration comes from this snapshot; its measured head pose is not reused.
-    pub fn ground_to_left_camera_at(
+    pub fn ground_to_camera_at(
         &self,
         head: &HeadJoints<f32>,
         ground_to_robot: Isometry3<Ground, Robot>,
-    ) -> Isometry3<Ground, LeftCamera> {
+    ) -> Isometry3<Ground, Camera> {
         self.head_to_camera
             * head_to_robot(head).inverse()
             * self.correction_in_robot
@@ -122,7 +122,7 @@ impl CameraMatrix {
     pub fn to_corrected(
         &self,
         correction_in_robot: Rotation3<Robot, Robot>,
-        correction_in_camera: Rotation3<LeftCamera, LeftCamera>,
+        correction_in_camera: Rotation3<Camera, Camera>,
     ) -> Self {
         let corrected_ground_to_robot = self.ground_to_robot;
         let corrected_robot_to_head = self.robot_to_head * correction_in_robot;
@@ -155,7 +155,7 @@ impl CameraMatrix {
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;
-    use kinematics::forward::head_to_left_camera;
+    use kinematics::forward::head_to_camera;
     use linear_algebra::{Orientation3, vector};
 
     use super::*;
@@ -226,7 +226,7 @@ mod tests {
             vector![0.1, -0.2, -0.6],
             Orientation3::from_euler_angles(0.1, -0.15, 0.2),
         );
-        let mount = head_to_left_camera(-0.2);
+        let mount = head_to_camera(-0.2);
         let robot_correction = Rotation3::from_euler_angles(0.03, -0.04, 0.02);
         let camera_correction = Rotation3::from_euler_angles(-0.02, 0.01, 0.04);
         let make_camera = |head: &HeadJoints<f32>, ground_to_robot| {
@@ -242,7 +242,7 @@ mod tests {
         };
         let camera = make_camera(&measured, ground_to_robot);
         assert_isometry_near(
-            camera.ground_to_left_camera_at(&measured, ground_to_robot),
+            camera.ground_to_camera_at(&measured, ground_to_robot),
             camera.ground_to_camera,
         );
 
@@ -256,7 +256,7 @@ mod tests {
         );
         let expected = make_camera(&candidate, current_ground_to_robot);
         assert_isometry_near(
-            camera.ground_to_left_camera_at(&candidate, current_ground_to_robot),
+            camera.ground_to_camera_at(&candidate, current_ground_to_robot),
             expected.ground_to_camera,
         );
 
@@ -266,7 +266,7 @@ mod tests {
         assert_isometry_near(
             camera
                 .to_corrected(extra_robot, extra_camera)
-                .ground_to_left_camera_at(&candidate, current_ground_to_robot),
+                .ground_to_camera_at(&candidate, current_ground_to_robot),
             expected
                 .to_corrected(extra_robot, extra_camera)
                 .ground_to_camera,

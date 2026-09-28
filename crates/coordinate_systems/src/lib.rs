@@ -80,11 +80,8 @@ generate_coordinate_system!(
     /// Origin: center of the camera model
     /// X axis pointing right, Y axis pointing down, Z axis pointing forward
     NormalizedDeviceCoordinates,
-    /// Rectified optical frame of the left camera used by the left-image projection model.
-    ///
-    /// Origin: left optical center
-    /// X axis pointing right, Y axis pointing down, Z axis pointing forward
-    LeftCamera,
+    /// 3D coordinate system centered on the camera
+    Camera,
     /// 2D Coordinate system of the camera image.
     ///
     /// Origin: top left corner of the image

@@ -21,7 +21,7 @@ pub struct GazeGeometry<'a> {
 struct RayGeometry {
     /// Vector from the pitch pivot to the target, expressed in Robot axes.
     pivot_target: Vector3<f64>,
-    /// Left optical center expressed in Head coordinates.
+    /// Camera optical center expressed in Head coordinates.
     camera_origin: Vector3<f64>,
     /// Unit direction of the requested image ray, expressed in Head axes.
     camera_ray: Vector3<f64>,
@@ -35,7 +35,7 @@ pub enum LookAtError {
     NoSolution,
 }
 
-/// Place a ground-relative point at the requested left-image position.
+/// Place a ground-relative point at the requested image position.
 /// Height is measured along Ground's +Z axis, in meters (e.g. ball radius).
 /// The reference chooses the nearest solution, including equivalent full turns;
 /// use the current joint-control reference, or measurements before initialization.
@@ -234,7 +234,7 @@ fn frames_target(
     geometry: &GazeGeometry<'_>,
 ) -> bool {
     let camera = geometry.camera_matrix;
-    let camera_target = camera.ground_to_left_camera_at(&joints, geometry.ground_to_robot) * target;
+    let camera_target = camera.ground_to_camera_at(&joints, geometry.ground_to_robot) * target;
     if camera_target.z() <= MINIMUM_DISTANCE as f32 {
         return false;
     }
@@ -244,7 +244,7 @@ fn frames_target(
 
 #[cfg(test)]
 mod tests {
-    use kinematics::forward::{head_to_left_camera, head_to_robot};
+    use kinematics::forward::{head_to_camera, head_to_robot};
     use linear_algebra::{Orientation3, Rotation3, nalgebra, vector};
 
     use super::*;
@@ -260,7 +260,7 @@ mod tests {
                 pitch: 0.2,
             })
             .inverse(),
-            head_to_left_camera(-0.2),
+            head_to_camera(-0.2),
         )
         .to_corrected(
             Rotation3::from_euler_angles(0.03, -0.04, 0.02),
@@ -307,7 +307,7 @@ mod tests {
                         )
                         .unwrap();
                         let target_in_camera = camera
-                            .ground_to_left_camera_at(&joints, geometry.ground_to_robot)
+                            .ground_to_camera_at(&joints, geometry.ground_to_robot)
                             * point![x, y, height];
                         assert!(target_in_camera.z() > 0.0);
                         let pixel = camera.intrinsics.project(target_in_camera.coords());
@@ -400,7 +400,7 @@ mod tests {
             vector![640.0, 480.0],
             Isometry3::identity(),
             head_to_robot(&HeadJoints::default()).inverse(),
-            head_to_left_camera(0.0),
+            head_to_camera(0.0),
         );
         assert_eq!(
             solve(

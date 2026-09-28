@@ -1,4 +1,4 @@
-use coordinate_systems::{LeftCamera, Robot};
+use coordinate_systems::{Camera, Robot};
 use linear_algebra::Isometry3;
 use projection::camera_matrix::CameraMatrix;
 
@@ -35,6 +35,6 @@ pub use types::visual_localization::{
     VisualLocalizationFrame as FieldMarkAssociations,
 };
 
-pub(crate) fn robot_to_camera(camera_matrix: &CameraMatrix) -> Isometry3<Robot, LeftCamera> {
+pub(crate) fn robot_to_camera(camera_matrix: &CameraMatrix) -> Isometry3<Robot, Camera> {
     camera_matrix.head_to_camera * camera_matrix.robot_to_head
 }
