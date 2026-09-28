@@ -251,7 +251,7 @@ impl HeadController {
                 },
                 parameters.direct_travel_speed,
             ),
-            HeadMotion::LookLeftAndRightOf {
+            HeadMotion::GlanceLeftAndRightOf {
                 target,
                 height_above_ground,
             } => {
@@ -335,7 +335,7 @@ fn mode_for(request: &HeadMotion, injected: bool) -> Mode {
     match request {
         HeadMotion::LookAround => Mode::Scan(ScanKind::LookAround),
         HeadMotion::SearchForLostBall => Mode::Scan(ScanKind::SearchForLostBall),
-        HeadMotion::LookLeftAndRightOf { .. } => Mode::Glance,
+        HeadMotion::GlanceLeftAndRightOf { .. } => Mode::Glance,
         HeadMotion::Damping => Mode::Damping,
         HeadMotion::ZeroAngles | HeadMotion::Center { .. } | HeadMotion::LookAt { .. } => {
             Mode::Direct

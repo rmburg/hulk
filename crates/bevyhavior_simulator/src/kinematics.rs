@@ -298,7 +298,7 @@ fn desired_head_yaw(
         Some(HeadMotion::LookAt { target, .. }) => {
             Orientation2::from_vector(target.coords()).angle()
         }
-        Some(HeadMotion::LookLeftAndRightOf { target, .. }) => {
+        Some(HeadMotion::GlanceLeftAndRightOf { target, .. }) => {
             let elapsed = now
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()

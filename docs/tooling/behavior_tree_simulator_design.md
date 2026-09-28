@@ -711,7 +711,7 @@ Head motion:
 - Derive target yaw from `MotionCommand::head_motion()`.
 - `ZeroAngles` and `Center` target yaw `0.0`.
 - `LookAt` targets the commanded ground point direction.
-- `LookLeftAndRightOf` adds a deterministic glance offset around the commanded ground point direction.
+- `GlanceLeftAndRightOf` adds a deterministic glance offset around the commanded ground point direction.
 - `LookAround` and `SearchForLostBall` use a deterministic scan pattern within configured yaw limits.
 - Clamp yaw by `head_yaw_minimum` and `head_yaw_maximum`.
 - Rate-limit yaw by `head_yaw_velocity * dt`.

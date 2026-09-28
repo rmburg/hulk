@@ -172,7 +172,7 @@ pub enum HeadMotion {
         height_above_ground: f32,
         image_region_target: ImageRegion,
     },
-    LookLeftAndRightOf {
+    GlanceLeftAndRightOf {
         target: Point2<Ground>,
         /// Height in meters along Ground's +Z, retained while offsetting either side.
         height_above_ground: f32,
