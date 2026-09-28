@@ -1,4 +1,4 @@
-//! Request resolution and coordination, independent of ROS interfaces and logging.
+//! Head target selection and joint control, independent of ROS interfaces and logging.
 
 use std::{sync::Arc, time::Duration};
 
@@ -8,43 +8,42 @@ use color_eyre::{
 };
 use coordinate_systems::Ground;
 use kinematics::joints::head::HeadJoints;
-use linear_algebra::{Point2, Rotation2, point};
+use linear_algebra::{Rotation2, point};
 use ros_z::time::Time;
 use types::{
     field_dimensions::GlobalFieldSide,
     joint_limits::JointLimits,
     motion_command::{HeadMotion, ImageRegion},
     motor_command::MotorCommand,
-    parameters::ImageRegionParameters,
     support_foot::Side,
 };
 
 use crate::{
-    joint_control::{HeadObservation, JointTarget, motor_commands},
-    look_at::{GazeGeometry, LookAtError, look_at},
+    joint_control::{HeadObservation, JointTarget},
+    look_at::{LookAtError, LookAtGeometry, LookAtTarget, look_at},
     parameters::Parameters,
     patterns::{GlanceState, ScanKind, ScanState},
 };
 
-pub struct HeadInputs {
-    pub parameters: Arc<Parameters>,
-    pub joint_limits: Arc<JointLimits>,
-    pub geometry: Option<GazeGeometry>,
-    pub field_width: Option<f32>,
-    pub global_field_side: Option<GlobalFieldSide>,
+pub(crate) struct HeadInputs {
+    pub(crate) parameters: Arc<Parameters>,
+    pub(crate) joint_limits: Arc<JointLimits>,
+    pub(crate) geometry: Option<LookAtGeometry>,
+    pub(crate) field_width: Option<f32>,
+    pub(crate) global_field_side: Option<GlobalFieldSide>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HoldReason {
+pub(crate) enum HoldReason {
     MissingGeometry,
     MissingFieldDimensions,
     InvalidFieldWidth,
     Geometry(LookAtError),
 }
 
-pub struct HeadOutput {
-    pub commands: HeadJoints<MotorCommand>,
-    pub hold_reason: Option<HoldReason>,
+pub(crate) struct HeadOutput {
+    pub(crate) commands: HeadJoints<MotorCommand>,
+    pub(crate) hold_reason: Option<HoldReason>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -62,18 +61,22 @@ struct TimedObservation {
 }
 
 #[derive(Default)]
-pub struct HeadController {
+pub(crate) struct HeadController {
     observation: Option<TimedObservation>,
     mode: Option<Mode>,
     last_evaluation: Option<Time>,
-    reference_position: Option<HeadJoints<f32>>,
-    hold_target: Option<HeadJoints<f32>>,
+    last_commanded_position: Option<HeadJoints<f32>>,
+    hold_position: Option<HeadJoints<f32>>,
     scan: ScanState,
     glance: GlanceState,
 }
 
 impl HeadController {
-    pub fn observe(&mut self, observation: HeadObservation, source_time: Time) -> Result<()> {
+    pub(crate) fn observe(
+        &mut self,
+        observation: HeadObservation,
+        source_time: Time,
+    ) -> Result<()> {
         observation.validate()?;
         if self
             .observation
@@ -89,7 +92,7 @@ impl HeadController {
         Ok(())
     }
 
-    pub fn evaluate(
+    pub(crate) fn evaluate(
         &mut self,
         request: &HeadMotion,
         inputs: &HeadInputs,
@@ -101,22 +104,25 @@ impl HeadController {
 
         let mode = mode_for(request, parameters.injected_head_joints.is_some());
         self.prepare_mode(mode, now, parameters.joint_control.reseed_after);
-        let reference = self.reference_position.unwrap_or(observation.positions);
-        let elapsed = if self.reference_position.is_some() {
-            self.last_evaluation
-                .map_or(0.0, |last| now.duration_since(last).as_secs_f32())
-        } else {
-            0.0
+        let (start_position, elapsed) = match self.last_commanded_position.zip(self.last_evaluation)
+        {
+            Some((position, time)) => (position, now.duration_since(time).as_secs_f32()),
+            None => (observation.positions, 0.0),
         };
-        let resolution = self.resolve(request, inputs, reference, now);
-        let commands = motor_commands(
-            resolution.target,
-            reference,
+        let HeadTarget {
+            target,
+            hold_reason,
+        } = self.compute_target(request, inputs, start_position, now);
+        if hold_reason.is_none() {
+            self.hold_position = None;
+        }
+        let commands = target.motor_commands(
+            start_position,
             elapsed,
             &parameters.joint_control,
             joint_limits,
         )?;
-        self.reference_position = if mode == Mode::Damping {
+        self.last_commanded_position = if mode == Mode::Damping {
             None
         } else {
             Some(HeadJoints {
@@ -127,7 +133,7 @@ impl HeadController {
         self.last_evaluation = Some(now);
         Ok(HeadOutput {
             commands,
-            hold_reason: resolution.hold_reason,
+            hold_reason,
         })
     }
 
@@ -161,53 +167,30 @@ impl HeadController {
         if self.mode != Some(mode) {
             self.scan = ScanState::default();
             self.glance = GlanceState::default();
-            self.hold_target = None;
+            self.hold_position = None;
         }
         self.mode = Some(mode);
     }
 
-    fn resolve(
+    fn compute_target(
         &mut self,
         request: &HeadMotion,
         inputs: &HeadInputs,
-        reference: HeadJoints<f32>,
+        start_position: HeadJoints<f32>,
         now: Time,
-    ) -> Resolution {
+    ) -> HeadTarget {
         let parameters = &inputs.parameters;
         if let Some(position) = parameters.injected_head_joints {
-            self.hold_target = None;
-            return Resolution::motion(move_to(position, parameters.direct_travel_speed));
+            return HeadTarget::new(move_to(position, parameters.direct_travel_speed));
         }
-        match *request {
+        let (look_at_target, travel_speed) = match *request {
             HeadMotion::ZeroAngles => {
-                self.hold_target = None;
-                Resolution::motion(move_to(
+                return HeadTarget::new(move_to(
                     HeadJoints::fill(0.0),
                     parameters.direct_travel_speed,
-                ))
+                ));
             }
-            HeadMotion::Damping => {
-                self.hold_target = None;
-                Resolution::motion(JointTarget::Damping)
-            }
-            HeadMotion::Center {
-                image_region_target,
-            } => self.center(image_region_target, inputs, reference),
-            HeadMotion::LookAt {
-                target,
-                height_above_ground,
-                image_region_target,
-            } => {
-                let angles = gaze(
-                    target,
-                    height_above_ground,
-                    image_region_target,
-                    inputs.geometry.as_ref(),
-                    &parameters.image_region_parameters,
-                    reference,
-                );
-                self.gaze_motion(angles, parameters.direct_travel_speed, reference)
-            }
+            HeadMotion::Damping => return HeadTarget::new(JointTarget::Damping),
             HeadMotion::LookAround | HeadMotion::SearchForLostBall => {
                 let kind = if matches!(request, HeadMotion::LookAround) {
                     ScanKind::LookAround
@@ -219,14 +202,55 @@ impl HeadController {
                 } else {
                     Side::Left
                 };
-                self.hold_target = None;
                 let scan_parameters = match kind {
                     ScanKind::LookAround => &parameters.look_around,
                     ScanKind::SearchForLostBall => &parameters.search_for_lost_ball,
                 };
-                let position = self.scan.update(kind, side, scan_parameters, now);
-                Resolution::motion(move_to(position, scan_parameters.travel_speed))
+                let target_position = self.scan.update(kind, side, scan_parameters, now);
+                return HeadTarget::new(move_to(target_position, scan_parameters.travel_speed));
             }
+            HeadMotion::MoveWithVelocity { yaw, pitch } => {
+                return HeadTarget::new(move_to(
+                    start_position + HeadJoints { yaw, pitch },
+                    parameters.direct_travel_speed,
+                ));
+            }
+            HeadMotion::Center {
+                image_region_target,
+            } => {
+                let Some(width) = inputs.field_width else {
+                    return self.hold(
+                        HoldReason::MissingFieldDimensions,
+                        start_position,
+                        parameters.direct_travel_speed,
+                    );
+                };
+                if !width.is_finite() || width <= 0.0 {
+                    return self.hold(
+                        HoldReason::InvalidFieldWidth,
+                        start_position,
+                        parameters.direct_travel_speed,
+                    );
+                }
+                (
+                    LookAtTarget {
+                        position: point![width / 2.0, 0.0, 0.0],
+                        image_region: image_region_target,
+                    },
+                    parameters.direct_travel_speed,
+                )
+            }
+            HeadMotion::LookAt {
+                target,
+                height_above_ground,
+                image_region_target,
+            } => (
+                LookAtTarget {
+                    position: point![target.x(), target.y(), height_above_ground],
+                    image_region: image_region_target,
+                },
+                parameters.direct_travel_speed,
+            ),
             HeadMotion::LookLeftAndRightOf {
                 target,
                 height_above_ground,
@@ -236,96 +260,60 @@ impl HeadController {
                     parameters.glance.phase_duration,
                     now,
                 );
-                let angles = gaze(
-                    Rotation2::<Ground, Ground>::new(angle) * target,
-                    height_above_ground,
-                    ImageRegion::Center,
-                    inputs.geometry.as_ref(),
-                    &parameters.image_region_parameters,
-                    reference,
-                );
-                self.gaze_motion(angles, parameters.glance.travel_speed, reference)
-            }
-            HeadMotion::MoveWithVelocity { yaw, pitch } => {
-                self.hold_target = None;
-                Resolution::motion(move_to(
-                    reference + HeadJoints { yaw, pitch },
-                    parameters.direct_travel_speed,
-                ))
-            }
-        }
-    }
-
-    fn center(
-        &mut self,
-        image_region: ImageRegion,
-        inputs: &HeadInputs,
-        reference: HeadJoints<f32>,
-    ) -> Resolution {
-        let parameters = &inputs.parameters;
-        let angles = inputs
-            .field_width
-            .ok_or(HoldReason::MissingFieldDimensions)
-            .and_then(|width| {
-                if !width.is_finite() || width <= 0.0 {
-                    return Err(HoldReason::InvalidFieldWidth);
-                }
-                gaze(
-                    point![width / 2.0, 0.0],
-                    0.0,
-                    image_region,
-                    inputs.geometry.as_ref(),
-                    &parameters.image_region_parameters,
-                    reference,
+                let target = Rotation2::<Ground, Ground>::new(angle) * target;
+                (
+                    LookAtTarget {
+                        position: point![target.x(), target.y(), height_above_ground],
+                        image_region: ImageRegion::Center,
+                    },
+                    parameters.glance.travel_speed,
                 )
-            });
-        self.gaze_motion(angles, parameters.direct_travel_speed, reference)
-    }
-
-    fn gaze_motion(
-        &mut self,
-        angles: Result<HeadJoints<f32>, HoldReason>,
-        travel_speed: HeadJoints<f32>,
-        reference: HeadJoints<f32>,
-    ) -> Resolution {
-        match angles {
-            Ok(position) => {
-                self.hold_target = None;
-                Resolution::motion(move_to(position, travel_speed))
             }
-            Err(reason) => {
-                let position = *self.hold_target.get_or_insert(reference);
-                Resolution {
-                    target: move_to(position, travel_speed),
-                    hold_reason: Some(reason),
-                }
-            }
+        };
+        let Some(geometry) = inputs.geometry.as_ref() else {
+            return self.hold(HoldReason::MissingGeometry, start_position, travel_speed);
+        };
+        match look_at(
+            &look_at_target,
+            geometry,
+            &parameters.image_region_parameters,
+            start_position,
+        ) {
+            Ok(target_position) => HeadTarget::new(move_to(target_position, travel_speed)),
+            Err(error) => self.hold(HoldReason::Geometry(error), start_position, travel_speed),
         }
     }
 
-    /// Explicitly reset all motion state and seed the measurement cache.
-    pub fn reset(&mut self, observation: HeadObservation, now: Time) -> Result<()> {
-        self.reset_motion();
-        self.observe(observation, now)
+    fn hold(
+        &mut self,
+        reason: HoldReason,
+        start_position: HeadJoints<f32>,
+        travel_speed: HeadJoints<f32>,
+    ) -> HeadTarget {
+        let hold_position = *self.hold_position.get_or_insert(start_position);
+        HeadTarget {
+            target: move_to(hold_position, travel_speed),
+            hold_reason: Some(reason),
+        }
     }
 
     fn reset_motion(&mut self) {
         self.mode = None;
         self.last_evaluation = None;
-        self.reference_position = None;
-        self.hold_target = None;
+        self.last_commanded_position = None;
+        self.hold_position = None;
         self.scan = ScanState::default();
         self.glance = GlanceState::default();
     }
 }
 
-struct Resolution {
+struct HeadTarget {
     target: JointTarget,
     hold_reason: Option<HoldReason>,
 }
 
-impl Resolution {
-    fn motion(target: JointTarget) -> Self {
+impl HeadTarget {
+    fn new(target: JointTarget) -> Self {
         Self {
             target,
             hold_reason: None,
@@ -338,26 +326,6 @@ fn move_to(position: HeadJoints<f32>, travel_speed: HeadJoints<f32>) -> JointTar
         position,
         travel_speed,
     }
-}
-
-fn gaze(
-    target: Point2<Ground>,
-    height: f32,
-    image_region: ImageRegion,
-    geometry: Option<&GazeGeometry>,
-    parameters: &ImageRegionParameters,
-    reference: HeadJoints<f32>,
-) -> Result<HeadJoints<f32>, HoldReason> {
-    let geometry = geometry.ok_or(HoldReason::MissingGeometry)?;
-    look_at(
-        target,
-        height,
-        image_region,
-        geometry,
-        parameters,
-        reference,
-    )
-    .map_err(HoldReason::Geometry)
 }
 
 fn mode_for(request: &HeadMotion, injected: bool) -> Mode {

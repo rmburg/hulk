@@ -1,4 +1,4 @@
-//! Throttled service failures and gaze holds.
+//! Throttled service failures and look-at holds.
 
 use std::time::Duration;
 
@@ -10,7 +10,7 @@ use types::motion_command::HeadMotion;
 use crate::head::{HeadOutput, HoldReason};
 
 #[derive(Debug, Clone, Copy)]
-pub enum FailureKind {
+pub(crate) enum FailureKind {
     Observation,
     Request,
     Response,
@@ -18,14 +18,14 @@ pub enum FailureKind {
 }
 
 #[derive(Default)]
-pub struct NodeLogger {
+pub(crate) struct NodeLogger {
     hold_reason: Option<HoldReason>,
     hold: WarningThrottle,
     failures: [WarningThrottle; 4],
 }
 
 impl NodeLogger {
-    pub fn log_output(
+    pub(crate) fn log_output(
         &mut self,
         request: &HeadMotion,
         output: &HeadOutput,
@@ -39,11 +39,15 @@ impl NodeLogger {
         if let Some(reason) = output.hold_reason
             && self.hold.ready(warning_interval, now)
         {
-            warn!(?request, ?reason, "head gaze unavailable; holding position");
+            warn!(
+                ?request,
+                ?reason,
+                "head look-at target unavailable; holding position"
+            );
         }
     }
 
-    pub fn log_error(
+    pub(crate) fn log_error(
         &mut self,
         kind: FailureKind,
         request: Option<&HeadMotion>,

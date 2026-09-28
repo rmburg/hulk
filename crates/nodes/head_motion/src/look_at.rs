@@ -1,20 +1,51 @@
-//! Analytic gaze geometry for K1. Target selection and motor control live elsewhere.
+//! Analytic look-at geometry for K1. Target selection and motor control live elsewhere.
 
 use std::f32::consts::TAU;
 
 use coordinate_systems::{Ground, Head, Pixel, Robot};
 use kinematics::{forward::head_to_robot, joints::head::HeadJoints};
-use linear_algebra::{Isometry3, Point2, Point3, Vector3, point};
+use linear_algebra::{Isometry3, Point2, Point3, Vector2, Vector3, point};
 use projection::camera_matrix::CameraMatrix;
 use types::{motion_command::ImageRegion, parameters::ImageRegionParameters};
 
-// Numerical tolerances for solving and checking gaze geometry.
+// Numerical tolerances for solving and checking look-at geometry.
 const MINIMUM_DISTANCE: f32 = 1e-6;
 const MAXIMUM_PIXEL_ERROR: f32 = 0.05;
 
-pub struct GazeGeometry {
-    pub camera_matrix: CameraMatrix,
-    pub ground_to_robot: Isometry3<Ground, Robot>,
+pub(crate) struct LookAtTarget {
+    pub(crate) position: Point3<Ground>,
+    pub(crate) image_region: ImageRegion,
+}
+
+pub(crate) struct LookAtGeometry {
+    pub(crate) camera_matrix: CameraMatrix,
+    pub(crate) ground_to_robot: Isometry3<Ground, Robot>,
+}
+
+impl LookAtGeometry {
+    fn validate(&self) -> Result<(), LookAtError> {
+        let camera = &self.camera_matrix;
+        let valid = camera
+            .image_size
+            .inner
+            .iter()
+            .chain(camera.intrinsics.focals.iter())
+            .all(|value| value.is_finite() && *value > 0.0)
+            && camera
+                .intrinsics
+                .optical_center
+                .inner
+                .coords
+                .iter()
+                .all(|value| value.is_finite())
+            && valid_transform(self.ground_to_robot)
+            && valid_transform(camera.head_to_camera)
+            && (camera.correction_in_robot.inner.quaternion().norm_squared() - 1.0).abs() < 1e-5;
+        if !valid {
+            return Err(LookAtError::InvalidGeometry);
+        }
+        Ok(())
+    }
 }
 
 struct RayGeometry {
@@ -26,39 +57,41 @@ struct RayGeometry {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LookAtError {
+pub(crate) enum LookAtError {
     InvalidTarget,
     InvalidGeometry,
-    InvalidReference,
+    InvalidReferencePosition,
     NoSolution,
 }
 
 /// Place a ground-relative point at the requested image position.
-/// Height is measured along Ground's +Z axis, in meters (e.g. ball radius).
-/// The reference chooses the nearest solution, including equivalent full turns;
-/// use the current joint-control reference, or measurements before initialization.
+/// The reference position chooses the nearest solution, including equivalent full turns;
+/// use the last commanded position, or the measured position before initialization.
 /// Returned angles are unconstrained: joint control owns mechanical limits.
-pub fn look_at(
-    target: Point2<Ground>,
-    height_above_ground: f32,
-    image_region: ImageRegion,
-    geometry: &GazeGeometry,
+pub(crate) fn look_at(
+    target: &LookAtTarget,
+    geometry: &LookAtGeometry,
     parameters: &ImageRegionParameters,
-    reference: HeadJoints<f32>,
+    reference_position: HeadJoints<f32>,
 ) -> Result<HeadJoints<f32>, LookAtError> {
-    let target = point![target.x(), target.y(), height_above_ground];
-    if !target.inner.coords.iter().all(|value| value.is_finite()) {
+    let position = target.position;
+    if !position.inner.coords.iter().all(|value| value.is_finite()) {
         return Err(LookAtError::InvalidTarget);
     }
-    if !reference.into_iter().all(f32::is_finite) {
-        return Err(LookAtError::InvalidReference);
+    if !reference_position.into_iter().all(f32::is_finite) {
+        return Err(LookAtError::InvalidReferencePosition);
     }
-    let pixel = requested_pixel(image_region, parameters, geometry)?;
+    geometry.validate()?;
+    let pixel = requested_pixel(
+        target.image_region,
+        parameters,
+        geometry.camera_matrix.image_size,
+    );
     let RayGeometry {
         pivot_target,
         camera_origin,
         camera_ray,
-    } = ray_geometry(target, pixel, geometry);
+    } = ray_geometry(position, pixel, geometry);
     let mut best = None;
     let mut best_distance = f32::INFINITY;
 
@@ -69,15 +102,16 @@ pub fn look_at(
             continue;
         }
         let point_on_ray = camera_origin + camera_ray * distance;
-        let Some(candidates) = joint_solutions(pivot_target, point_on_ray, reference) else {
+        let Some(candidates) = joint_solutions(pivot_target, point_on_ray, reference_position)
+        else {
             continue;
         };
         for candidate in candidates {
-            if !frames_target(candidate, target, pixel, geometry) {
+            if !frames_target(candidate, position, pixel, geometry) {
                 continue;
             }
-            let distance = (candidate.yaw - reference.yaw).powi(2)
-                + (candidate.pitch - reference.pitch).powi(2);
+            let distance = (candidate.yaw - reference_position.yaw).powi(2)
+                + (candidate.pitch - reference_position.pitch).powi(2);
             if distance < best_distance {
                 best = Some(candidate);
                 best_distance = distance;
@@ -90,37 +124,17 @@ pub fn look_at(
 fn requested_pixel(
     region: ImageRegion,
     parameters: &ImageRegionParameters,
-    geometry: &GazeGeometry,
-) -> Result<Point2<Pixel>, LookAtError> {
-    let camera = &geometry.camera_matrix;
+    image_size: Vector2<Pixel>,
+) -> Point2<Pixel> {
     let normalized = match region {
         ImageRegion::Center => parameters.center,
         ImageRegion::Bottom => parameters.bottom,
         ImageRegion::Top => parameters.top,
     };
-    let valid = camera
-        .image_size
-        .inner
-        .iter()
-        .chain(camera.intrinsics.focals.iter())
-        .all(|value| value.is_finite() && *value > 0.0)
-        && camera
-            .intrinsics
-            .optical_center
-            .inner
-            .coords
-            .iter()
-            .all(|value| value.is_finite())
-        && valid_transform(geometry.ground_to_robot)
-        && valid_transform(camera.head_to_camera)
-        && (camera.correction_in_robot.inner.quaternion().norm_squared() - 1.0).abs() < 1e-5;
-    if !valid {
-        return Err(LookAtError::InvalidGeometry);
-    }
-    Ok(point![
-        normalized.x() * camera.image_size.x(),
-        normalized.y() * camera.image_size.y()
-    ])
+    point![
+        normalized.x() * image_size.x(),
+        normalized.y() * image_size.y()
+    ]
 }
 
 fn valid_transform<From, To>(transform: Isometry3<From, To>) -> bool {
@@ -136,7 +150,7 @@ fn valid_transform<From, To>(transform: Isometry3<From, To>) -> bool {
 fn ray_geometry(
     target: Point3<Ground>,
     pixel: Point2<Pixel>,
-    geometry: &GazeGeometry,
+    geometry: &LookAtGeometry,
 ) -> RayGeometry {
     let camera = &geometry.camera_matrix;
     let target_in_robot = camera.correction_in_robot * (geometry.ground_to_robot * target);
@@ -180,7 +194,7 @@ fn ray_distances(
 fn joint_solutions(
     target: Vector3<Robot>,
     point: Point3<Head>,
-    reference: HeadJoints<f32>,
+    reference_position: HeadJoints<f32>,
 ) -> Option<[HeadJoints<f32>; 2]> {
     let horizontal_squared = target.x() * target.x() + target.y() * target.y();
     let x_squared = horizontal_squared - point.y() * point.y();
@@ -191,35 +205,36 @@ fn joint_solutions(
     Some(
         [x_squared.max(0.0).sqrt(), -x_squared.max(0.0).sqrt()].map(|x| {
             let yaw = if horizontal_squared <= MINIMUM_DISTANCE.powi(2) {
-                reference.yaw
+                reference_position.yaw
             } else {
                 target.y().atan2(target.x()) - point.y().atan2(x)
             };
             let pitch = if point.x().hypot(point.z()) <= MINIMUM_DISTANCE {
-                reference.pitch
+                reference_position.pitch
             } else {
                 point.z().atan2(point.x()) - target.z().atan2(x)
             };
             HeadJoints {
-                yaw: nearest_equivalent(yaw, reference.yaw),
-                pitch: nearest_equivalent(pitch, reference.pitch),
+                yaw: nearest_equivalent(yaw, reference_position.yaw),
+                pitch: nearest_equivalent(pitch, reference_position.pitch),
             }
         }),
     )
 }
 
-fn nearest_equivalent(angle: f32, reference: f32) -> f32 {
-    angle + TAU * ((reference - angle) / TAU).round()
+fn nearest_equivalent(angle: f32, reference_angle: f32) -> f32 {
+    angle + TAU * ((reference_angle - angle) / TAU).round()
 }
 
 fn frames_target(
-    joints: HeadJoints<f32>,
+    candidate_position: HeadJoints<f32>,
     target: Point3<Ground>,
     pixel: Point2<Pixel>,
-    geometry: &GazeGeometry,
+    geometry: &LookAtGeometry,
 ) -> bool {
     let camera = &geometry.camera_matrix;
-    let camera_target = camera.ground_to_camera_at(&joints, geometry.ground_to_robot) * target;
+    let camera_target =
+        camera.ground_to_camera_at(&candidate_position, geometry.ground_to_robot) * target;
     if camera_target.z() <= MINIMUM_DISTANCE {
         return false;
     }

@@ -1,7 +1,7 @@
-pub mod head;
-pub mod joint_control;
-pub mod logging;
-pub mod look_at;
+mod head;
+mod joint_control;
+mod logging;
+mod look_at;
 pub mod node;
-pub mod parameters;
-pub mod patterns;
+mod parameters;
+mod patterns;

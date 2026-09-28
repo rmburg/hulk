@@ -22,7 +22,7 @@ use types::{
 use crate::{
     head::{HeadController, HeadInputs},
     logging::{FailureKind, NodeLogger},
-    look_at::GazeGeometry,
+    look_at::LookAtGeometry,
     parameters::Parameters,
 };
 
@@ -197,7 +197,7 @@ impl InputCaches {
             .get_latest()
             .and_then(|ground| ground.inner)
             .zip(self.camera_matrix.get_latest())
-            .map(|(ground_to_robot, camera)| GazeGeometry {
+            .map(|(ground_to_robot, camera)| LookAtGeometry {
                 camera_matrix: camera.inner.clone(),
                 ground_to_robot,
             });

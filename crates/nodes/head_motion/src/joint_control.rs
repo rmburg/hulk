@@ -8,8 +8,8 @@ use types::{joint_limits::JointLimits, motor_command::MotorCommand};
 use crate::parameters::JointControlParameters;
 
 #[derive(Clone, Copy)]
-pub struct HeadObservation {
-    pub positions: HeadJoints<f32>,
+pub(crate) struct HeadObservation {
+    pub(crate) positions: HeadJoints<f32>,
 }
 
 impl From<HeadJoints<MotorState>> for HeadObservation {
@@ -24,7 +24,7 @@ impl From<HeadJoints<MotorState>> for HeadObservation {
 }
 
 impl HeadObservation {
-    pub fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         ensure!(
             self.positions.into_iter().all(f32::is_finite),
             "head observation contains non-finite positions"
@@ -33,7 +33,7 @@ impl HeadObservation {
     }
 }
 
-pub enum JointTarget {
+pub(crate) enum JointTarget {
     MoveTo {
         position: HeadJoints<f32>,
         travel_speed: HeadJoints<f32>,
@@ -41,49 +41,50 @@ pub enum JointTarget {
     Damping,
 }
 
-/// The caller seeds the reference from measurements on activation. Position bounds
-/// take precedence over speed limiting if measurements or live limit edits put the
-/// reference outside the permitted range. No acceleration or jerk limits apply.
-pub fn motor_commands(
-    target: JointTarget,
-    reference: HeadJoints<f32>,
-    elapsed: f32,
-    parameters: &JointControlParameters,
-    limits: &JointLimits,
-) -> Result<HeadJoints<MotorCommand>> {
-    let mut commands = HeadJoints::fill(MotorCommand::zeros());
-    match target {
-        JointTarget::MoveTo {
-            position,
-            travel_speed,
-        } => {
-            ensure!(
-                position.into_iter().all(f32::is_finite),
-                "head target contains non-finite values"
-            );
-            for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
-                let [minimum, maximum] = limits.position.head[joint];
-                let start = reference[joint].clamp(minimum, maximum);
-                let goal = position[joint].clamp(minimum, maximum);
-                let step = travel_speed[joint].min(parameters.maximum_velocity[joint]) * elapsed;
-                commands[joint] = MotorCommand {
-                    position: (start + (goal - start).clamp(-step, step)).clamp(minimum, maximum),
-                    kp: parameters.kp[joint],
-                    kd: parameters.kd[joint],
-                    ..MotorCommand::zeros()
-                };
+impl JointTarget {
+    pub(crate) fn motor_commands(
+        self,
+        start_position: HeadJoints<f32>,
+        elapsed: f32,
+        parameters: &JointControlParameters,
+        joint_limits: &JointLimits,
+    ) -> Result<HeadJoints<MotorCommand>> {
+        let mut commands = HeadJoints::fill(MotorCommand::zeros());
+        match self {
+            Self::MoveTo {
+                position,
+                travel_speed,
+            } => {
+                ensure!(
+                    position.into_iter().all(f32::is_finite),
+                    "head target contains non-finite values"
+                );
+                for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
+                    let [minimum, maximum] = joint_limits.position.head[joint];
+                    let start = start_position[joint].clamp(minimum, maximum);
+                    let goal = position[joint].clamp(minimum, maximum);
+                    let step =
+                        travel_speed[joint].min(parameters.maximum_velocity[joint]) * elapsed;
+                    commands[joint] = MotorCommand {
+                        position: (start + (goal - start).clamp(-step, step))
+                            .clamp(minimum, maximum),
+                        kp: parameters.kp[joint],
+                        kd: parameters.kd[joint],
+                        ..MotorCommand::zeros()
+                    };
+                }
+            }
+            Self::Damping => {
+                for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
+                    let [minimum, maximum] = joint_limits.position.head[joint];
+                    commands[joint] = MotorCommand {
+                        position: start_position[joint].clamp(minimum, maximum),
+                        kd: parameters.damping_kd[joint],
+                        ..MotorCommand::zeros()
+                    };
+                }
             }
         }
-        JointTarget::Damping => {
-            for joint in [HeadJoint::Yaw, HeadJoint::Pitch] {
-                let [minimum, maximum] = limits.position.head[joint];
-                commands[joint] = MotorCommand {
-                    position: reference[joint].clamp(minimum, maximum),
-                    kd: parameters.damping_kd[joint],
-                    ..MotorCommand::zeros()
-                };
-            }
-        }
+        Ok(commands)
     }
-    Ok(commands)
 }

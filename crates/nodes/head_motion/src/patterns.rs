@@ -9,13 +9,13 @@ use types::support_foot::Side;
 use crate::parameters::ScanParameters;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum ScanKind {
+pub(crate) enum ScanKind {
     LookAround,
     SearchForLostBall,
 }
 
 #[derive(Default)]
-pub struct ScanState {
+pub(crate) struct ScanState {
     waypoint: Option<Waypoint>,
     started: Option<Time>,
 }
@@ -28,7 +28,7 @@ enum Waypoint {
 
 impl ScanState {
     /// The coordinator resets this state when the mode changes or requests stop.
-    pub fn update(
+    pub(crate) fn update(
         &mut self,
         kind: ScanKind,
         initial_side: Side,
@@ -63,14 +63,14 @@ impl ScanState {
 }
 
 #[derive(Default)]
-pub struct GlanceState {
+pub(crate) struct GlanceState {
     right: bool,
     started: Option<Time>,
 }
 
 impl GlanceState {
     /// Target updates preserve the current side. The coordinator handles resets.
-    pub fn angle(&mut self, angle: f32, duration: Duration, now: Time) -> f32 {
+    pub(crate) fn angle(&mut self, angle: f32, duration: Duration, now: Time) -> f32 {
         let started = self.started.get_or_insert(now);
         if now.duration_since(*started) >= duration {
             self.right = !self.right;
