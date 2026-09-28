@@ -14,6 +14,8 @@ pub(crate) struct Parameters {
     pub(crate) direct_travel_speed: HeadJoints<f32>,
     /// Maximum age of the latest head measurement when answering a request.
     pub(crate) maximum_observation_age: Duration,
+    /// Maximum age of the ground-to-robot pose used for look-at requests.
+    pub(crate) maximum_ground_pose_age: Duration,
 
     /// Explicit debug override of behavior requests, still subject to joint control.
     pub(crate) injected_head_joints: Option<HeadJoints<f32>>,
@@ -37,6 +39,9 @@ impl Parameters {
         }
         if self.maximum_observation_age.is_zero() {
             return Err("maximum_observation_age must be positive".into());
+        }
+        if self.maximum_ground_pose_age.is_zero() {
+            return Err("maximum_ground_pose_age must be positive".into());
         }
         if self
             .injected_head_joints

@@ -14,6 +14,8 @@
   direct_travel_speed: { yaw: 3.141592654, pitch: 3.141592654 },
   // 500 Hz observations normally arrive every 2 ms. Reject stale request inputs.
   maximum_observation_age: { secs: 0, nanos: 50000000 },
+  // Allow processing delay in the IMU/kinematics ground-pose pipeline.
+  maximum_ground_pose_age: { secs: 0, nanos: 100000000 },
 
   injected_head_joints: null,
 

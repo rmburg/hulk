@@ -10,6 +10,7 @@ use ros_z::{
     cache::Cache,
     prelude::*,
     qos::{QosDurability, QosHistory},
+    time::Time,
 };
 use ros_z_schema::{ServiceDef, compute_hash};
 use serde::{Deserialize, Serialize};
@@ -113,7 +114,7 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                 let now = node.clock().now();
                 let result = (|| {
                     request.validate().map_err(Report::msg)?;
-                    let inputs = inputs.snapshot(Arc::clone(&snapshot.typed))?;
+                    let inputs = inputs.snapshot(Arc::clone(&snapshot.typed), now)?;
                     controller.evaluate(&request, &inputs, now)
                 })();
                 let response = match result {
@@ -192,7 +193,7 @@ impl InputCaches {
         Ok(())
     }
 
-    fn snapshot(&self, parameters: Arc<Parameters>) -> Result<HeadInputs> {
+    fn snapshot(&self, parameters: Arc<Parameters>, now: Time) -> Result<HeadInputs> {
         let joint_limits = self
             .joint_limits
             .clone()
@@ -201,6 +202,10 @@ impl InputCaches {
         let geometry = self
             .ground_to_robot
             .get_latest()
+            .filter(|ground| {
+                ground.time <= now
+                    && now.duration_since(ground.time) <= parameters.maximum_ground_pose_age
+            })
             .and_then(|ground| ground.inner)
             .zip(self.camera_matrix.get_latest())
             .map(|(ground_to_robot, camera)| LookAtGeometry {
