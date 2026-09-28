@@ -296,11 +296,16 @@ impl HeadController {
         }
     }
 
+    /// Reseed position control from measurements while preserving pattern timing.
+    pub(crate) fn clear_command_history(&mut self) {
+        self.last_commanded_position = None;
+        self.hold_position = None;
+    }
+
     fn reset_motion(&mut self) {
         self.mode = None;
         self.last_evaluation = None;
-        self.last_commanded_position = None;
-        self.hold_position = None;
+        self.clear_command_history();
         self.scan = ScanState::default();
         self.glance = GlanceState::default();
     }

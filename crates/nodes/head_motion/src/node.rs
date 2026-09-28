@@ -104,6 +104,7 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                 let (request, reply) = match received {
                     Ok(received) => received.into_parts(),
                     Err(error) => {
+                        controller.clear_command_history();
                         logger.log_error(FailureKind::Request, None, &error.into(),
                             warning_interval, node.clock().now());
                         continue;
@@ -121,12 +122,14 @@ pub async fn run(ctx: Arc<Context>) -> Result<()> {
                         Ok(output.commands)
                     }
                     Err(error) => {
+                        controller.clear_command_history();
                         logger.log_error(FailureKind::Request, Some(&request), &error,
                             warning_interval, now);
                         Err(HeadMotionError { source: Arc::new(error) })
                     }
                 };
                 if let Err(error) = reply.reply_async(&response).await {
+                    controller.clear_command_history();
                     logger.log_error(FailureKind::Response, Some(&request), &error.into(),
                         warning_interval, now);
                 }
